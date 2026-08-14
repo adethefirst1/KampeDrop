@@ -1,0 +1,228 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Manrope", system-ui, sans-serif;
+
+  /* Badagry dusk — lagoon deep, warm laterite, evening gold */
+  --color-ink: #06181c;
+  --color-ink-soft: #0f2e34;
+  --color-mist: #e6f0ee;
+  --color-paper: #f3f8f6;
+  --color-lagoon: #0c6560;
+  --color-lagoon-deep: #084845;
+  --color-mango: #d9772f;
+  --color-mango-deep: #b85a1c;
+  --color-line: #c5d9d5;
+  --color-muted: #4a6562;
+  --color-ok: #1f8a5b;
+  --color-palm: #2a5c38;
+  --color-dusk: #efc27a;
+  --color-laterite: #c4784a;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100svh;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background: var(--color-mist);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  #root {
+    min-height: 100svh;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  img {
+    max-width: 100%;
+    display: block;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-lagoon) 28%, white);
+  }
+}
+
+@layer components {
+  .container-site {
+    width: min(1120px, calc(100% - 2rem));
+    margin-inline: auto;
+  }
+
+  .container-narrow {
+    width: min(640px, calc(100% - 2rem));
+    margin-inline: auto;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem;
+    background: var(--color-mango);
+    color: white;
+    font-weight: 700;
+    padding: 0.95rem 1.5rem;
+    transition: background 160ms ease, transform 160ms ease;
+  }
+
+  .btn-primary:hover {
+    background: var(--color-mango-deep);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem;
+    border: 1px solid color-mix(in oklab, white 22%, transparent);
+    background: color-mix(in oklab, white 10%, transparent);
+    color: white;
+    font-weight: 600;
+    padding: 0.95rem 1.5rem;
+    backdrop-filter: blur(8px);
+    transition: background 160ms ease;
+  }
+
+  .btn-secondary:hover {
+    background: color-mix(in oklab, white 16%, transparent);
+  }
+
+  .btn-ink {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem;
+    background: var(--color-ink);
+    color: white;
+    font-weight: 700;
+    padding: 0.95rem 1.5rem;
+    transition: background 160ms ease;
+  }
+
+  .btn-ink:hover {
+    background: var(--color-ink-soft);
+  }
+
+  .field {
+    width: 100%;
+    border-radius: 1rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-paper);
+    padding: 0.85rem 1rem;
+    outline: none;
+  }
+
+  .field:focus {
+    border-color: var(--color-lagoon);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-lagoon) 25%, transparent);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .page-enter {
+    animation: page-enter 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .ken-burns {
+    animation: ken-burns 22s ease-in-out infinite alternate;
+  }
+
+  .pulse-soft {
+    animation: pulse-soft 2.4s ease-in-out infinite;
+  }
+
+  .marquee {
+    animation: marquee 32s linear infinite;
+  }
+
+  .mist-wash {
+    background:
+      radial-gradient(ellipse 90% 55% at 8% -8%, rgba(12, 101, 96, 0.14), transparent 55%),
+      radial-gradient(ellipse 70% 40% at 100% 0%, rgba(217, 119, 47, 0.07), transparent 48%),
+      var(--color-mist);
+  }
+
+  .wave-line {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 48' fill='none'%3E%3Cpath d='M0 24c160 18 320-18 480 0s320 18 480 0 320-18 480 0v24H0V24z' fill='%230c6560' fill-opacity='0.1'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-size: 720px 48px;
+    background-position: bottom;
+  }
+
+  .lagoon-shine {
+    background:
+      linear-gradient(135deg, rgba(239, 194, 122, 0.18), transparent 40%),
+      linear-gradient(180deg, transparent, rgba(6, 24, 28, 0.55));
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ken-burns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.07);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0.85;
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

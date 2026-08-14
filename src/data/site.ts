@@ -22,10 +22,10 @@ export const SITE = {
 
 /** Local brand photography — lagoon dusk, corridor, home kitchen */
 export const IMAGES = {
-  hero: '/brand/hero.png',
-  corridor: '/brand/corridor.png',
-  door: '/brand/kitchen.png',
-  kitchen: '/brand/kitchen.png',
+  hero: '/brand/hero.jpg',
+  corridor: '/brand/corridor.jpg',
+  door: '/brand/kitchen.jpg',
+  kitchen: '/brand/kitchen.jpg',
   mart:
     'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80',
   pharmacy:

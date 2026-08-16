@@ -53,11 +53,14 @@ export function Stagger({
   className,
   as = 'div',
   fast = false,
+  /** Use mount animation instead of scroll — needed for filterable lists */
+  immediate = false,
 }: {
   children: ReactNode
   className?: string
   as?: 'div' | 'ul' | 'ol' | 'section'
   fast?: boolean
+  immediate?: boolean
 }) {
   const reduce = useReducedMotion()
   const Comp = motion[as]
@@ -72,8 +75,9 @@ export function Stagger({
       className={className}
       variants={fast ? staggerFast : stagger}
       initial="hidden"
-      whileInView="show"
-      viewport={scrollViewport}
+      {...(immediate
+        ? { animate: 'show' as const }
+        : { whileInView: 'show' as const, viewport: scrollViewport })}
     >
       {children}
     </Comp>

@@ -2,17 +2,37 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
-import { DELIVERY_FEE, getVendor, type MenuItem, type Vendor } from '../data/vendors'
+import { DELIVERY_FEE, type MenuItem, type Vendor } from '../data/vendors'
+import {
+  createOrderId,
+  createPasskey,
+  type EscrowState,
+} from '../data/ops'
+import { useCatalog } from './CatalogContext'
 
 export type CartLine = {
   vendorId: string
   item: MenuItem
   qty: number
 }
+
+export type Fulfillment = 'delivery' | 'pickup'
+
+export type OrderStatus =
+  | 'finding_rider'
+  | 'rider_assigned'
+  | 'confirmed'
+  | 'preparing'
+  | 'ready_for_pickup'
+  | 'picked_up'
+  | 'on_the_way'
+  | 'delivered'
+  | 'cancelled'
 
 export type PlacedOrder = {
   id: string
@@ -22,11 +42,23 @@ export type PlacedOrder = {
   address: string
   note: string
   payment: 'cod' | 'transfer'
+  /** Delivery to door, or customer collects at vendor */
+  fulfillment: Fulfillment
   lines: CartLine[]
   deliveryFee: number
   subtotal: number
   total: number
-  status: 'placed' | 'preparing' | 'on_the_way' | 'delivered'
+  status: OrderStatus
+  /** 4-digit passkey — rider pickup or customer collection */
+  passkey: string
+  escrowState: EscrowState
+  cancelledAt: string | null
+  cancelReason: string | null
+  /** Drop landmark / Google place (delivery). Pickup spot label for pickup. */
+  placeName: string | null
+  placeId: string | null
+  placeLat: number | null
+  placeLng: number | null
 }
 
 type CartContextValue = {
@@ -46,22 +78,29 @@ type CartContextValue = {
     address: string
     note: string
     payment: 'cod' | 'transfer'
+    fulfillment: Fulfillment
+    placeName?: string | null
+    placeId?: string | null
+    placeLat?: number | null
+    placeLng?: number | null
   }) => PlacedOrder
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
 
-function nextOrderId() {
-  const n = Math.floor(1000 + Math.random() * 9000)
-  return `SD-${n}`
-}
-
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { getVendor, vendors } = useCatalog()
   const [lines, setLines] = useState<CartLine[]>([])
   const [lastOrder, setLastOrder] = useState<PlacedOrder | null>(null)
 
   const vendorId = lines[0]?.vendorId ?? null
   const vendor = vendorId ? getVendor(vendorId) ?? null : null
+
+  useEffect(() => {
+    if (!vendorId) return
+    const v = getVendor(vendorId)
+    if (!v || !v.active) setLines([])
+  }, [vendorId, getVendor, vendors])
 
   const addItem = useCallback((nextVendorId: string, item: MenuItem) => {
     let result: { ok: true } | { ok: false; reason: string } = { ok: true }
@@ -100,25 +139,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
       address: string
       note: string
       payment: 'cod' | 'transfer'
+      fulfillment: Fulfillment
+      placeName?: string | null
+      placeId?: string | null
+      placeLat?: number | null
+      placeLng?: number | null
     }) => {
       const subtotal = lines.reduce((sum, l) => sum + l.item.price * l.qty, 0)
+      const fulfillment = input.fulfillment
+      const deliveryFee = fulfillment === 'pickup' ? 0 : DELIVERY_FEE
       const order: PlacedOrder = {
-        id: nextOrderId(),
+        id: createOrderId(),
         createdAt: new Date().toISOString(),
-        ...input,
+        customerName: input.customerName,
+        phone: input.phone,
+        address: input.address,
+        note: input.note,
+        payment: input.payment,
+        fulfillment,
         lines: [...lines],
-        deliveryFee: DELIVERY_FEE,
+        deliveryFee,
         subtotal,
-        total: subtotal + DELIVERY_FEE,
-        status: 'placed',
+        total: subtotal + deliveryFee,
+        status: fulfillment === 'pickup' ? 'confirmed' : 'finding_rider',
+        passkey: createPasskey(),
+        escrowState: input.payment === 'cod' ? 'cod' : 'held',
+        cancelledAt: null,
+        cancelReason: null,
+        placeName: input.placeName ?? null,
+        placeId: input.placeId ?? null,
+        placeLat: input.placeLat ?? null,
+        placeLng: input.placeLng ?? null,
       }
-      setLastOrder(order)
-      setLines([])
       try {
         sessionStorage.setItem(`suredrop-order-${order.id}`, JSON.stringify(order))
       } catch {
         /* ignore */
       }
+      setLastOrder(order)
+      setLines([])
       return order
     },
     [lines],

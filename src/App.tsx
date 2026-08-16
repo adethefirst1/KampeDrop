@@ -8,6 +8,8 @@ import {
 } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { CartProvider } from './context/CartContext'
+import { CatalogProvider } from './context/CatalogContext'
+import { OpsProvider } from './context/OpsContext'
 import { HomePage } from './pages/HomePage'
 import { BrowsePage } from './pages/BrowsePage'
 import { VendorPage } from './pages/VendorPage'
@@ -16,10 +18,21 @@ import { CheckoutPage } from './pages/CheckoutPage'
 import { TrackPage } from './pages/TrackPage'
 import { HowPage } from './pages/HowPage'
 import { GuaranteePage } from './pages/GuaranteePage'
+import {
+  AdminInboxPage,
+  AdminLoginPage,
+  AdminOrderPage,
+} from './pages/admin/AdminPages'
+import {
+  AdminVendorEditPage,
+  AdminVendorsPage,
+} from './pages/admin/AdminCatalogPages'
 import { APP_BASE, appPath, isStandaloneDisplay } from './paths'
 
 function StandaloneGate({ children }: { children: ReactNode }) {
   const location = useLocation()
+  if (location.pathname.startsWith('/admin')) return children
+
   const marketing =
     location.pathname === '/' ||
     location.pathname === '/how' ||
@@ -46,6 +59,12 @@ function AppRoutes() {
         <Route path={`${APP_BASE}/checkout`} element={<CheckoutPage />} />
         <Route path={`${APP_BASE}/orders/:orderId`} element={<TrackPage />} />
 
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/admin" element={<AdminInboxPage />} />
+        <Route path="/admin/orders/:orderId" element={<AdminOrderPage />} />
+        <Route path="/admin/vendors" element={<AdminVendorsPage />} />
+        <Route path="/admin/vendors/:vendorId" element={<AdminVendorEditPage />} />
+
         <Route path="/browse" element={<Navigate to={APP_BASE} replace />} />
         <Route path="/vendors/:vendorId" element={<LegacyVendorRedirect />} />
         <Route path="/cart" element={<Navigate to={appPath('/cart')} replace />} />
@@ -70,10 +89,14 @@ function LegacyOrderRedirect() {
 
 export default function App() {
   return (
-    <CartProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </CartProvider>
+    <CatalogProvider>
+      <CartProvider>
+        <OpsProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </OpsProvider>
+      </CartProvider>
+    </CatalogProvider>
   )
 }

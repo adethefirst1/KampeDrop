@@ -1,48 +1,146 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { appPath } from '../paths'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { OrderLayout, GuaranteePill } from '../components/layout'
-import { useCart } from '../context/CartContext'
-import { formatNaira } from '../data/vendors'
+import { Link, Navigate } from 'react-router-dom'
+import { OrderLayout, StickyCommerceBar } from '../components/layout'
+import { PlacePicker } from '../components/PlacePicker'
+import { useCart, type Fulfillment } from '../context/CartContext'
+import { useOps } from '../context/OpsContext'
+import type { DeliveryPlace } from '../data/places'
+import { DELIVERY_FEE, formatNaira } from '../data/vendors'
+import { saveOrderToSupabase } from '../lib/ordersApi'
 
 export function CheckoutPage() {
-  const navigate = useNavigate()
-  const { itemCount, total, vendor, placeOrder } = useCart()
+  const { itemCount, subtotal, vendor, placeOrder } = useCart()
+  const { ingestPlacedOrder } = useOps()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [address, setAddress] = useState('')
+  const [fulfillment, setFulfillment] = useState<Fulfillment>('delivery')
+  const [place, setPlace] = useState<DeliveryPlace | null>(null)
   const [note, setNote] = useState('')
-  const [payment, setPayment] = useState<'cod' | 'transfer'>('cod')
+  const [payment, setPayment] = useState<'cod' | 'transfer'>('transfer')
   const [submitting, setSubmitting] = useState(false)
+  const [placedId, setPlacedId] = useState<string | null>(null)
+  const [placeError, setPlaceError] = useState(false)
+
+  const deliveryFee = fulfillment === 'pickup' ? 0 : DELIVERY_FEE
+  const total = subtotal + deliveryFee
+  const pickup = fulfillment === 'pickup'
+
+  if (placedId) {
+    return <Navigate to={appPath(`/orders/${placedId}`)} replace />
+  }
 
   if (!itemCount) {
     return <Navigate to={appPath('/cart')} replace />
   }
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
+    if (!pickup && !place?.address.trim()) {
+      setPlaceError(true)
+      return
+    }
+    if (pickup && !vendor) {
+      return
+    }
     setSubmitting(true)
-    const order = placeOrder({
-      customerName: name.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
-      note: note.trim(),
-      payment,
-    })
-    navigate(appPath(`/orders/${order.id}`), { replace: true })
+    setPlaceError(false)
+    try {
+      const pickupAddress =
+        vendor?.pickupSpot ||
+        `${vendor?.area ?? 'Badagry'} — ${vendor?.name ?? 'vendor'}`
+      const order = placeOrder({
+        customerName: name.trim(),
+        phone: phone.trim(),
+        address: pickup ? pickupAddress : place!.address.trim(),
+        note: note.trim(),
+        payment,
+        fulfillment,
+        placeName: pickup ? vendor?.name ?? 'Pickup' : place?.name,
+        placeId: pickup ? null : place?.placeId,
+        placeLat: pickup ? null : place?.lat,
+        placeLng: pickup ? null : place?.lng,
+      })
+      ingestPlacedOrder(order)
+
+      const cloud = await saveOrderToSupabase(order)
+      if (!cloud.ok) {
+        console.error('Supabase save failed:', cloud.reason)
+        window.alert(
+          `Order placed locally, but cloud save failed:\n\n${cloud.reason}\n\nCheck .env keys, table columns, and RLS policies.`,
+        )
+      }
+
+      setPlacedId(order.id)
+    } catch {
+      setSubmitting(false)
+    }
   }
 
   return (
     <OrderLayout>
       <Link to={appPath('/cart')} className="text-sm font-semibold text-muted hover:text-ink">
-        ← Back to cart
+        ← Cart
       </Link>
-      <h1 className="mt-4 font-display text-[2rem] font-semibold tracking-[-0.03em]">Checkout</h1>
-      <p className="mt-2 text-sm leading-relaxed text-muted">
-        Guest checkout — we only need enough to find your door in Badagry.
+      <h1 className="mt-3 font-display text-[1.75rem] font-semibold tracking-[-0.03em]">
+        Checkout
+      </h1>
+      <p className="mt-1 text-sm text-muted">
+        {vendor?.name} · guest checkout · Badagry only
       </p>
 
-      <form onSubmit={onSubmit} className="mt-6 space-y-4">
+      <form id="checkout-form" onSubmit={onSubmit} className="mt-5 space-y-3.5">
+        <fieldset>
+          <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">
+            How will you get it?
+          </legend>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                {
+                  id: 'delivery' as const,
+                  title: 'Delivery',
+                  hint: `+${formatNaira(DELIVERY_FEE)}`,
+                },
+                {
+                  id: 'pickup' as const,
+                  title: 'Pickup',
+                  hint: 'Free · at vendor',
+                },
+              ] as const
+            ).map((opt) => {
+              const active = fulfillment === opt.id
+              return (
+                <label
+                  key={opt.id}
+                  className={`cursor-pointer rounded-2xl px-3 py-3 text-center ring-1 transition ${
+                    active ? 'bg-ink text-white ring-ink' : 'bg-paper text-ink-soft ring-line'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="fulfillment"
+                    className="sr-only"
+                    checked={active}
+                    onChange={() => {
+                      setFulfillment(opt.id)
+                      setPlaceError(false)
+                    }}
+                  />
+                  <span className="block text-sm font-bold">{opt.title}</span>
+                  <span
+                    className={`mt-0.5 block text-[11px] font-medium ${
+                      active ? 'text-white/70' : 'text-muted'
+                    }`}
+                  >
+                    {opt.hint}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
+
         <Field label="Full name" htmlFor="name">
           <input
             id="name"
@@ -55,7 +153,7 @@ export function CheckoutPage() {
           />
         </Field>
 
-        <Field label="Phone number" htmlFor="phone">
+        <Field label="Phone" htmlFor="phone">
           <input
             id="phone"
             required
@@ -68,43 +166,72 @@ export function CheckoutPage() {
           />
         </Field>
 
-        <Field label="Delivery address" htmlFor="address">
-          <textarea
-            id="address"
-            required
-            rows={3}
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="Street, landmark, estate gate — be specific"
-            className="field resize-none"
-            autoComplete="street-address"
-          />
-        </Field>
+        {pickup ? (
+          <div className="rounded-2xl bg-mist px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted">
+              Collect at
+            </p>
+            <p className="mt-1 font-semibold">{vendor?.name}</p>
+            <p className="mt-0.5 text-sm text-ink-soft">
+              {vendor?.pickupSpot || vendor?.area}
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              We’ll text when it’s ready. Bring your passkey to collect.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted">
+              Drop landmark
+            </p>
+            <PlacePicker
+              value={place}
+              onChange={(p) => {
+                setPlace(p)
+                setPlaceError(false)
+              }}
+            />
+            {placeError && (
+              <p className="mt-2 text-sm font-semibold text-mango-deep">
+                Pick a landmark or place so the rider can find you.
+              </p>
+            )}
+          </div>
+        )}
 
-        <Field label="Note for rider (optional)" htmlFor="note">
+        <Field
+          label={pickup ? 'Note for vendor (optional)' : 'Note for rider (optional)'}
+          htmlFor="note"
+        >
           <input
             id="note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Call on arrival · blue gate"
+            placeholder={
+              pickup
+                ? 'Coming on a black scooter · call when ready'
+                : 'Call on arrival · blue gate · flat 2'
+            }
             className="field"
           />
         </Field>
 
         <fieldset>
-          <legend className="mb-2 text-sm font-bold text-ink">Payment</legend>
-          <div className="grid gap-2">
+          <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">
+            Payment
+          </legend>
+          <div className="grid grid-cols-2 gap-2">
             {(
               [
                 {
-                  id: 'cod' as const,
-                  title: 'Cash on delivery',
-                  desc: 'Pay when it arrives. Simple.',
+                  id: 'transfer' as const,
+                  title: 'Bank transfer',
+                  hint: pickup ? 'Held until collect' : 'Held until pickup',
                 },
                 {
-                  id: 'transfer' as const,
-                  title: 'Transfer',
-                  desc: 'We’ll send account details after confirm.',
+                  id: 'cod' as const,
+                  title: pickup ? 'Pay at pickup' : 'Cash on delivery',
+                  hint: pickup ? 'Pay at vendor' : 'Pay the rider',
                 },
               ] as const
             ).map((opt) => {
@@ -112,43 +239,65 @@ export function CheckoutPage() {
               return (
                 <label
                   key={opt.id}
-                  className={`flex cursor-pointer items-start gap-3 rounded-2xl p-4 ring-1 transition ${
-                    active ? 'bg-lagoon/8 ring-lagoon' : 'bg-paper ring-line'
+                  className={`cursor-pointer rounded-2xl px-3 py-3 text-center ring-1 transition ${
+                    active ? 'bg-ink text-white ring-ink' : 'bg-paper text-ink-soft ring-line'
                   }`}
                 >
                   <input
                     type="radio"
                     name="payment"
-                    className="mt-1"
+                    className="sr-only"
                     checked={active}
                     onChange={() => setPayment(opt.id)}
                   />
-                  <span>
-                    <span className="block font-semibold">{opt.title}</span>
-                    <span className="mt-0.5 block text-sm text-muted">{opt.desc}</span>
+                  <span className="block text-sm font-bold">{opt.title}</span>
+                  <span
+                    className={`mt-0.5 block text-[11px] font-medium ${
+                      active ? 'text-white/70' : 'text-muted'
+                    }`}
+                  >
+                    {opt.hint}
                   </span>
                 </label>
               )
             })}
           </div>
+          {payment === 'transfer' && (
+            <p className="mt-2 text-xs leading-relaxed text-muted">
+              You’ll get bank details on the next screen. Transfer to SureDrop
+              escrow — vendor is paid only after{' '}
+              {pickup ? 'you collect' : 'pickup'}.
+            </p>
+          )}
         </fieldset>
 
-        <div className="rounded-3xl bg-ink px-4 py-4 text-white">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
-            {vendor?.name}
-          </p>
-          <div className="mt-2 flex items-end justify-between gap-3">
-            <p className="text-sm text-white/70">Total due</p>
-            <p className="font-display text-2xl font-semibold">{formatNaira(total)}</p>
-          </div>
-        </div>
-
-        <GuaranteePill />
-
-        <button type="submit" disabled={submitting} className="btn-primary w-full disabled:opacity-70">
-          {submitting ? 'Securing your order…' : 'Place order'}
-        </button>
+        <div className="h-28" aria-hidden />
       </form>
+
+      <StickyCommerceBar>
+        <div className="mb-2 flex items-center justify-between px-1 text-xs text-white/60">
+          <span>
+            {pickup ? 'Pickup' : 'Delivery'} · {formatNaira(deliveryFee)}
+          </span>
+          <span className="font-bold text-white">{formatNaira(total)}</span>
+        </div>
+        <button
+          type="submit"
+          form="checkout-form"
+          disabled={submitting}
+          className="flex w-full items-center justify-center rounded-xl bg-mango px-4 py-3.5 text-sm font-bold text-ink disabled:opacity-70"
+        >
+          {submitting
+            ? 'Placing order…'
+            : pickup
+              ? payment === 'transfer'
+                ? 'Place pickup · pay by transfer'
+                : 'Place pickup · pay at vendor'
+              : payment === 'transfer'
+                ? 'Place order · pay by transfer'
+                : 'Place order · pay on delivery'}
+        </button>
+      </StickyCommerceBar>
     </OrderLayout>
   )
 }
@@ -164,7 +313,9 @@ function Field({
 }) {
   return (
     <label className="block" htmlFor={htmlFor}>
-      <span className="mb-2 block text-sm font-bold">{label}</span>
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">
+        {label}
+      </span>
       {children}
     </label>
   )

@@ -3,66 +3,240 @@ import { appPath } from '../paths'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { OrderLayout, GuaranteePill } from '../components/layout'
+import { TransferPayPanel } from '../components/TransferPayPanel'
+import { HelpGuaranteePanel } from '../components/HelpGuaranteePanel'
 import { AnimatedCheck, SecureSeal } from '../components/motion'
-import { loadOrder, useCart, type PlacedOrder } from '../context/CartContext'
-import { SITE } from '../data/site'
-import { formatNaira, getVendor } from '../data/vendors'
+import {
+  loadOrder,
+  useCart,
+  type OrderStatus,
+  type PlacedOrder,
+} from '../context/CartContext'
+import { useCatalog } from '../context/CatalogContext'
+import { useOps } from '../context/OpsContext'
+import {
+  canCancelOrder,
+  feelForStatus,
+  getRider,
+  labelForStatus,
+  pipelineFor,
+  statusRank,
+  furtherStatus,
+} from '../data/ops'
+import { fetchOrderById } from '../lib/ordersApi'
+import { formatNaira } from '../data/vendors'
 import { easeOut, springSnap } from '../motion/tokens'
-
-const steps = [
-  { key: 'placed', label: 'Order placed', feel: 'We heard you.' },
-  { key: 'preparing', label: 'Preparing', feel: 'Your vendor is on it.' },
-  { key: 'on_the_way', label: 'On the way', feel: 'Rider is moving toward you.' },
-  { key: 'delivered', label: 'Delivered', feel: 'Secured at your door.' },
-] as const
-
-type Status = (typeof steps)[number]['key']
 
 export function TrackPage() {
   const { orderId } = useParams()
   const { lastOrder } = useCart()
+  const { getVendor } = useCatalog()
+  const { getOrder: getOpsOrder, cancelOrder, claimTransferPaid, flagProblem } =
+    useOps()
   const reduce = useReducedMotion()
-  const stored = orderId ? loadOrder(orderId) : null
-  const baseOrder = stored ?? (lastOrder?.id === orderId ? lastOrder : null)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const [cloudOrder, setCloudOrder] = useState<PlacedOrder | null>(null)
+  const [cloudLoading, setCloudLoading] = useState(Boolean(orderId))
+  const [cloudTried, setCloudTried] = useState(false)
 
-  const [status, setStatus] = useState<Status>(baseOrder?.status ?? 'placed')
+  const opsOrder = orderId ? getOpsOrder(orderId) : undefined
+  const stored = useMemo(() => {
+    if (!orderId) return null
+    return loadOrder(orderId)
+  }, [orderId, opsOrder, cloudOrder])
+
+  // Prefer Supabase RPC; local/session/ops only as fallback.
+  useEffect(() => {
+    if (!orderId) {
+      setCloudOrder(null)
+      setCloudLoading(false)
+      setCloudTried(true)
+      return
+    }
+
+    let cancelled = false
+    setCloudLoading(true)
+    setCloudTried(false)
+    setCloudOrder(null)
+
+    void (async () => {
+      const result = await fetchOrderById(orderId)
+      if (cancelled) return
+      if (result.ok) {
+        setCloudOrder(result.order)
+        try {
+          sessionStorage.setItem(
+            `suredrop-order-${orderId}`,
+            JSON.stringify(result.order),
+          )
+        } catch {
+          /* ignore */
+        }
+      } else {
+        setCloudOrder(null)
+        console.warn(
+          'Track: cloud fetch failed, using local fallback:',
+          result.reason,
+        )
+      }
+      setCloudLoading(false)
+      setCloudTried(true)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [orderId])
+
+  const localFallback: PlacedOrder | null = useMemo(() => {
+    if (!orderId) return null
+    if (opsOrder) {
+      return {
+        id: opsOrder.id,
+        createdAt: opsOrder.createdAt,
+        customerName: opsOrder.customerName,
+        phone: opsOrder.phone,
+        address: opsOrder.address,
+        note: opsOrder.note,
+        payment: opsOrder.payment,
+        fulfillment: opsOrder.fulfillment ?? 'delivery',
+        lines: opsOrder.lines,
+        deliveryFee: opsOrder.deliveryFee,
+        subtotal: opsOrder.subtotal,
+        total: opsOrder.total,
+        status: opsOrder.status,
+        passkey: opsOrder.passkey,
+        escrowState: opsOrder.escrowState,
+        cancelledAt: opsOrder.cancelledAt,
+        cancelReason: opsOrder.cancelReason,
+        placeName: opsOrder.placeName,
+        placeId: opsOrder.placeId,
+        placeLat: opsOrder.placeLat,
+        placeLng: opsOrder.placeLng,
+      }
+    }
+    if (stored) return stored
+    if (lastOrder?.id === orderId) return lastOrder
+    return null
+  }, [orderId, stored, lastOrder, opsOrder])
+
+  const baseOrder: PlacedOrder | null = cloudOrder ?? localFallback
+
+  const status: OrderStatus = useMemo(() => {
+    const fromCloud = cloudOrder?.status
+    const fromOps = opsOrder?.status
+    const fromLocal = localFallback?.status
+    // Cloud wins when present; merge forward with local ops if ops is ahead
+    // (ops may not write to Supabase yet during dual-write).
+    if (fromCloud && fromOps) return furtherStatus(fromCloud, fromOps)
+    if (fromCloud) return fromCloud
+    if (fromOps && fromLocal) return furtherStatus(fromOps, fromLocal)
+    return fromOps ?? fromLocal ?? 'finding_rider'
+  }, [cloudOrder?.status, opsOrder?.status, localFallback?.status])
 
   useEffect(() => {
-    if (!baseOrder) return
-    setStatus(baseOrder.status)
-    const timers = [
-      window.setTimeout(() => setStatus('preparing'), 3500),
-      window.setTimeout(() => setStatus('on_the_way'), 8000),
-      window.setTimeout(() => setStatus('delivered'), 14000),
-    ]
-    return () => timers.forEach(clearTimeout)
-  }, [baseOrder])
+    if (!orderId || !opsOrder) return
+    try {
+      const raw = sessionStorage.getItem(`suredrop-order-${orderId}`)
+      if (!raw) {
+        if (baseOrder) {
+          sessionStorage.setItem(
+            `suredrop-order-${orderId}`,
+            JSON.stringify(baseOrder),
+          )
+        }
+        return
+      }
+      const buyer = JSON.parse(raw) as PlacedOrder
+      const nextStatus = furtherStatus(buyer.status, opsOrder.status)
+      sessionStorage.setItem(
+        `suredrop-order-${orderId}`,
+        JSON.stringify({
+          ...buyer,
+          ...opsOrder,
+          status: nextStatus,
+        }),
+      )
+    } catch {
+      /* ignore */
+    }
+  }, [orderId, opsOrder, baseOrder])
 
   const order: PlacedOrder | null = useMemo(() => {
     if (!baseOrder) return null
-    return { ...baseOrder, status }
-  }, [baseOrder, status])
+    return {
+      ...baseOrder,
+      fulfillment: baseOrder.fulfillment ?? 'delivery',
+      status,
+      passkey: opsOrder?.passkey ?? baseOrder.passkey,
+      escrowState: opsOrder?.escrowState ?? baseOrder.escrowState,
+    }
+  }, [baseOrder, status, opsOrder])
 
-  if (!order) {
+  const fulfillment = order?.fulfillment ?? 'delivery'
+  const pickup = fulfillment === 'pickup'
+  const pipe = pipelineFor(fulfillment)
+  const vendor = getVendor(order?.lines[0]?.vendorId ?? '')
+  const rider = getRider(opsOrder?.riderId ?? null)
+  const cancelled = status === 'cancelled'
+  const delivered = status === 'delivered'
+  const activeIndex = cancelled ? -1 : statusRank(status, fulfillment)
+  const feel = feelForStatus(status, fulfillment)
+  const showCancel = order ? canCancelOrder(status, fulfillment) : false
+
+  if (cloudLoading && !localFallback) {
     return (
       <OrderLayout>
         <div className="py-16 text-center">
-          <h1 className="font-display text-2xl font-semibold">Order not found</h1>
-          <p className="mt-2 text-sm text-muted">
-            This tracking link may have expired in this browser.
+          <p className="text-sm font-semibold text-muted">Loading order…</p>
+        </div>
+      </OrderLayout>
+    )
+  }
+
+  if (cloudTried && !order) {
+    return (
+      <OrderLayout>
+        <div className="py-16 text-center">
+          <h1 className="font-display text-2xl font-semibold tracking-[-0.03em]">
+            Order not found
+          </h1>
+          <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted">
+            This link may be from another phone or browser. Place a new order, or
+            call SureDrop with your order ID.
           </p>
-          <Link to={appPath()} className="mt-6 inline-block font-semibold text-lagoon">
-            Start a new order
+          <Link to={appPath()} className="btn-primary mt-8 inline-flex">
+            Browse vendors
           </Link>
         </div>
       </OrderLayout>
     )
   }
 
-  const vendor = getVendor(order.lines[0]?.vendorId ?? '')
-  const activeIndex = steps.findIndex((s) => s.key === status)
-  const feel = steps[activeIndex]?.feel ?? ''
-  const delivered = status === 'delivered'
+  if (!order) {
+    return (
+      <OrderLayout>
+        <div className="py-16 text-center">
+          <p className="text-sm font-semibold text-muted">Loading order…</p>
+        </div>
+      </OrderLayout>
+    )
+  }
+
+  function onCancel() {
+    if (!order) return
+    setCancelBusy(true)
+    setCancelError(null)
+    const result = cancelOrder(order.id, 'Cancelled by buyer')
+    setCancelBusy(false)
+    if (!result.ok) {
+      setCancelError(result.reason)
+      return
+    }
+    setCancelOpen(false)
+  }
 
   return (
     <OrderLayout>
@@ -73,14 +247,26 @@ export function TrackPage() {
           </p>
           <AnimatePresence mode="wait">
             <motion.h1
-              key={delivered ? 'done' : 'live'}
+              key={cancelled ? 'x' : delivered ? 'done' : 'live'}
               className="mt-2 font-display text-[2.1rem] font-semibold leading-tight tracking-[-0.03em]"
               initial={reduce ? false : { opacity: 0, y: 12, filter: 'blur(4px)' }}
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, y: -8, filter: 'blur(4px)' }}
               transition={{ duration: 0.45, ease: easeOut }}
             >
-              {delivered ? 'It’s secured.' : 'We’re on it.'}
+              {cancelled
+                ? 'Order cancelled'
+                : delivered
+                  ? pickup
+                    ? 'Collected.'
+                    : 'It’s secured.'
+                  : status === 'finding_rider'
+                    ? 'Finding your rider'
+                    : status === 'ready_for_pickup'
+                      ? 'Ready for pickup'
+                      : pickup
+                        ? 'Pickup in progress'
+                        : 'We’re on it.'}
             </motion.h1>
           </AnimatePresence>
           <AnimatePresence mode="wait">
@@ -96,136 +282,230 @@ export function TrackPage() {
             </motion.p>
           </AnimatePresence>
           <p className="mt-2 text-sm text-muted">
-            {vendor?.name} · for {order.customerName.split(' ')[0]}
+            {vendor?.name ?? 'Vendor'} · for {order.customerName.split(' ')[0]}
           </p>
         </div>
         {delivered && <SecureSeal />}
       </div>
 
-      <div className="mt-8 overflow-hidden rounded-[1.75rem] bg-ink p-5 text-white">
-        <ol>
-          {steps.map((step, i) => {
-            const done = i <= activeIndex
-            const current = i === activeIndex
-            return (
-              <li key={step.key} className="relative flex gap-4 pb-6 last:pb-0">
-                {i < steps.length - 1 && (
-                  <span className="absolute left-[11px] top-6 h-[calc(100%-12px)] w-0.5 bg-white/15" aria-hidden>
-                    <motion.span
-                      className="absolute inset-x-0 top-0 origin-top bg-lagoon"
-                      initial={{ scaleY: 0 }}
-                      animate={{ scaleY: i < activeIndex ? 1 : 0 }}
-                      transition={{ duration: 0.55, ease: easeOut }}
-                      style={{ height: '100%', display: 'block' }}
-                    />
-                  </span>
-                )}
-                <motion.span
-                  className={`relative z-10 mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
-                    done ? 'bg-lagoon text-white' : 'bg-white/10 text-white/40'
-                  }`}
-                  animate={
-                    current && !delivered && !reduce
-                      ? { scale: [1, 1.12, 1], boxShadow: ['0 0 0 0 rgba(26,122,100,0.5)', '0 0 0 10px rgba(26,122,100,0)', '0 0 0 0 rgba(26,122,100,0)'] }
-                      : { scale: 1 }
-                  }
-                  transition={
-                    current && !delivered
-                      ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' }
-                      : springSnap
-                  }
-                >
-                  {done ? <AnimatedCheck active={done} /> : i + 1}
-                </motion.span>
-                <div className="min-w-0">
-                  <motion.p
-                    className={`font-semibold ${done ? 'text-white' : 'text-white/40'}`}
-                    animate={{ opacity: done ? 1 : 0.45 }}
+      {cancelled && (
+        <div className="mt-5 rounded-2xl bg-mist px-4 py-3 text-sm text-ink-soft">
+          {order.cancelReason ?? 'Cancelled.'}
+          {order.payment === 'transfer' && order.escrowState === 'refunded'
+            ? ' Your payment has been refunded from escrow.'
+            : null}
+        </div>
+      )}
+
+      {!cancelled && (
+        <div className="mt-8 overflow-hidden rounded-[1.75rem] bg-ink p-5 text-white">
+          <ol>
+            {pipe.map((step, i) => {
+              const done = i <= activeIndex
+              const current = status === step
+              return (
+                <li key={step} className="relative flex gap-4 pb-5 last:pb-0">
+                  {i < pipe.length - 1 && (
+                    <span
+                      className="absolute left-[11px] top-6 h-[calc(100%-12px)] w-0.5 bg-white/15"
+                      aria-hidden
+                    >
+                      <motion.span
+                        className="absolute inset-x-0 top-0 origin-top bg-lagoon"
+                        initial={{ scaleY: 0 }}
+                        animate={{ scaleY: i < activeIndex ? 1 : 0 }}
+                        transition={{ duration: 0.55, ease: easeOut }}
+                        style={{ height: '100%', display: 'block' }}
+                      />
+                    </span>
+                  )}
+                  <motion.span
+                    className={`relative z-10 mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
+                      done ? 'bg-lagoon text-white' : 'bg-white/10 text-white/40'
+                    }`}
+                    animate={
+                      current && !delivered && !reduce
+                        ? {
+                            scale: [1, 1.12, 1],
+                            boxShadow: [
+                              '0 0 0 0 rgba(26,122,100,0.5)',
+                              '0 0 0 10px rgba(26,122,100,0)',
+                              '0 0 0 0 rgba(26,122,100,0)',
+                            ],
+                          }
+                        : { scale: 1 }
+                    }
+                    transition={
+                      current && !delivered
+                        ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' }
+                        : springSnap
+                    }
                   >
-                    {step.label}
-                  </motion.p>
-                  <AnimatePresence>
+                    {done ? <AnimatedCheck active={done} /> : i + 1}
+                  </motion.span>
+                  <div className="min-w-0">
+                    <p className={`font-semibold ${done ? 'text-white' : 'text-white/40'}`}>
+                      {labelForStatus(step, fulfillment)}
+                    </p>
                     {current && (
-                      <motion.p
-                        className="mt-0.5 text-sm text-white/55"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                      >
-                        {step.feel}
-                      </motion.p>
+                      <p className="mt-0.5 text-sm text-white/55">
+                        {feelForStatus(step, fulfillment)}
+                      </p>
                     )}
-                  </AnimatePresence>
-                </div>
-              </li>
-            )
-          })}
-        </ol>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+      )}
+
+      {!cancelled && !delivered && (
+        <div className="mt-5 rounded-[1.5rem] bg-paper p-4 ring-1 ring-line">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-lagoon">
+            {pickup ? 'Collection passkey' : 'Pickup passkey'}
+          </p>
+          <p className="mt-2 font-display text-4xl font-semibold tracking-[0.2em]">
+            {order.passkey}
+          </p>
+          <p className="mt-2 text-sm text-muted">
+            {pickup
+              ? 'Show this code at the vendor when you collect. It confirms handoff and releases payment to the seller.'
+              : 'Share this code only when the rider picks up at the vendor. It confirms pickup and releases payment to the seller.'}
+          </p>
+        </div>
+      )}
+
+      {rider && !cancelled && !pickup && (
+        <div className="mt-4 rounded-2xl bg-mist px-4 py-3 text-sm">
+          <span className="font-semibold">Rider:</span> {rider.name} · {rider.area}
+        </div>
+      )}
+
+      {order.payment === 'transfer' && !cancelled && (
+        <TransferPayPanel
+          order={{
+            id: order.id,
+            total: order.total,
+            payment: order.payment,
+            escrowState: order.escrowState,
+            paymentState: opsOrder?.paymentState,
+          }}
+          onClaimPaid={() => claimTransferPaid(order.id)}
+        />
+      )}
+
+      {order.payment === 'transfer' && order.escrowState === 'refunded' && (
+        <div className="mt-4 rounded-2xl border border-line bg-mist px-4 py-3 text-sm text-muted">
+          Transfer refunded — you won’t be charged for this order.
+        </div>
+      )}
+
+      <div className="mt-5">
+        <GuaranteePill />
       </div>
 
-      <motion.div
-        className="mt-5"
-        initial={reduce ? false : { opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.45 }}
-      >
-        <GuaranteePill />
-      </motion.div>
+      <HelpGuaranteePanel
+        orderId={order.id}
+        status={status}
+        alreadyFlagged={opsOrder?.hasProblem}
+        onReport={(reason) => flagProblem(order.id, reason)}
+      />
 
-      <motion.div
-        className="mt-5 rounded-3xl bg-paper p-4 ring-1 ring-line"
-        initial={reduce ? false : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.28, duration: 0.45 }}
-      >
-        <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Delivering to</p>
-        <p className="mt-2 font-semibold">{order.address}</p>
+      <div className="mt-5 rounded-3xl bg-paper p-4 ring-1 ring-line">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+          {pickup ? 'Collecting at' : 'Delivering to'}
+        </p>
+        {order.placeName && (
+          <p className="mt-2 font-semibold text-lagoon">{order.placeName}</p>
+        )}
+        <p className={`font-semibold ${order.placeName ? 'mt-0.5 text-sm text-ink-soft' : 'mt-2'}`}>
+          {order.address}
+        </p>
         <p className="mt-1 text-sm text-muted">{order.phone}</p>
         {order.note && (
           <p className="mt-2 rounded-xl bg-mist px-3 py-2 text-sm text-ink-soft">
             Note: {order.note}
           </p>
         )}
-      </motion.div>
+      </div>
 
-      <motion.div
-        className="mt-4 rounded-3xl bg-paper p-4 ring-1 ring-line"
-        initial={reduce ? false : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.36, duration: 0.45 }}
-      >
+      <div className="mt-4 rounded-3xl bg-paper p-4 ring-1 ring-line">
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Your items</p>
         <ul className="mt-3 space-y-2">
-          {order.lines.map((line, i) => (
-            <motion.li
-              key={line.item.id}
-              className="flex justify-between gap-3 text-sm"
-              initial={reduce ? false : { opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 + i * 0.05 }}
-            >
+          {order.lines.map((line) => (
+            <li key={line.item.id} className="flex justify-between gap-3 text-sm">
               <span>
                 {line.qty}× {line.item.name}
               </span>
-              <span className="font-semibold">{formatNaira(line.item.price * line.qty)}</span>
-            </motion.li>
+              <span className="font-semibold">
+                {formatNaira(line.item.price * line.qty)}
+              </span>
+            </li>
           ))}
         </ul>
         <div className="mt-3 flex justify-between border-t border-line pt-3 text-sm">
           <span className="text-muted">
-            {order.payment === 'cod' ? 'Cash on delivery' : 'Transfer'} · total
+            {pickup ? 'Pickup' : 'Delivery'} ·{' '}
+            {order.payment === 'cod'
+              ? pickup
+                ? 'Pay at vendor'
+                : 'Cash on delivery'
+              : 'Transfer'}{' '}
+            · total
           </span>
-          <span className="font-display text-lg font-semibold">{formatNaira(order.total)}</span>
+          <span className="font-display text-lg font-semibold">
+            {formatNaira(order.total)}
+          </span>
         </div>
-      </motion.div>
+      </div>
 
-      <a
-        href={`tel:${SITE.supportPhone}`}
-        className="mt-6 flex w-full items-center justify-center rounded-2xl border border-line bg-paper py-4 text-sm font-bold text-ink transition hover:bg-white"
-      >
-        Need help? Talk to a real person
-      </a>
-      <p className="mt-2 text-center text-xs text-muted">A human — not a bot.</p>
+      {showCancel && (
+        <div className="mt-6">
+          {!cancelOpen ? (
+            <button
+              type="button"
+              onClick={() => setCancelOpen(true)}
+              className="w-full rounded-2xl border border-line bg-paper py-3.5 text-sm font-bold text-muted"
+            >
+              Cancel order
+            </button>
+          ) : (
+            <div className="rounded-2xl bg-red-50 p-4">
+              <p className="text-sm font-semibold text-red-800">
+                {pickup
+                  ? 'Cancel before the kitchen starts? Full refund if you paid by transfer. Once preparing begins, cancel is locked.'
+                  : 'Cancel while we find a rider? Full refund if you paid by transfer. Once a rider accepts, the kitchen can start and cancel is locked.'}
+              </p>
+              {cancelError && (
+                <p className="mt-2 text-sm font-semibold text-red-700">{cancelError}</p>
+              )}
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  disabled={cancelBusy}
+                  onClick={onCancel}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  Confirm cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCancelOpen(false)}
+                  className="rounded-xl bg-paper px-4 py-2 text-sm font-bold ring-1 ring-line"
+                >
+                  Keep order
+                </button>
+              </div>
+            </div>
+          )}
+          <p className="mt-2 text-center text-xs text-muted">
+            {pickup
+              ? 'After the kitchen starts, this order can’t be cancelled.'
+              : 'After a rider accepts, this order can’t be cancelled.'}
+          </p>
+        </div>
+      )}
 
       <Link
         to={appPath()}

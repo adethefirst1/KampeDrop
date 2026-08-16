@@ -287,19 +287,22 @@ export function BottomCartBar() {
           <motion.div layout transition={springSoft}>
             <Link
               to={appPath('/cart')}
-              className="pointer-events-auto mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl bg-ink px-4 py-3.5 text-white shadow-[0_12px_40px_rgba(14,28,24,0.35)]"
+              className="pointer-events-auto mx-auto flex max-w-xl items-center gap-3 rounded-2xl bg-ink px-3.5 py-3 text-white shadow-[0_12px_40px_rgba(14,28,24,0.35)]"
             >
-              <div className="min-w-0 text-left">
-                <p className="truncate text-sm font-semibold">{vendor?.name ?? 'Your order'}</p>
-                <p className="text-xs text-white/65">
-                  {itemCount} item{itemCount === 1 ? '' : 's'} · almost secured
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-mango text-sm font-bold text-white">
+                {itemCount}
+              </span>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-sm font-bold">View cart</p>
+                <p className="truncate text-xs text-white/65">
+                  {vendor?.name ?? 'Your order'}
                 </p>
               </div>
               <motion.span
                 key={total}
                 initial={reduce ? false : { scale: 0.9, opacity: 0.5 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="shrink-0 rounded-xl bg-mango px-3 py-2 text-sm font-bold"
+                className="shrink-0 text-sm font-bold"
               >
                 {formatNaira(total)}
               </motion.span>
@@ -308,6 +311,17 @@ export function BottomCartBar() {
         </motion.div>
       )}
     </AnimatePresence>
+  )
+}
+
+/** Sticky primary CTA for cart / checkout (replaces bottom cart bar on those screens) */
+export function StickyCommerceBar({ children }: { children: ReactNode }) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6">
+      <div className="pointer-events-auto mx-auto max-w-xl rounded-2xl bg-ink p-3 shadow-[0_12px_40px_rgba(14,28,24,0.35)]">
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -337,10 +351,17 @@ export function MarketingLayout({
 export function AppShell({
   children,
   narrow = false,
+  showInstallTip,
 }: {
   children: ReactNode
   narrow?: boolean
+  /** Default: only on browse home to keep commerce screens clean */
+  showInstallTip?: boolean
 }) {
+  const { pathname } = useLocation()
+  const tip =
+    showInstallTip ?? (pathname === APP_BASE || pathname === `${APP_BASE}/`)
+
   return (
     <div className="min-h-svh mist-wash text-ink">
       <AppHeader />
@@ -349,7 +370,7 @@ export function AppShell({
           narrow ? 'container-narrow' : 'mx-auto max-w-lg px-4 md:max-w-3xl'
         }`}
       >
-        <InAppInstallTip />
+        {tip && <InAppInstallTip />}
         {children}
       </main>
       <BottomCartBar />
@@ -358,5 +379,5 @@ export function AppShell({
 }
 
 export function OrderLayout({ children }: { children: ReactNode }) {
-  return <AppShell narrow>{children}</AppShell>
+  return <AppShell narrow showInstallTip={false}>{children}</AppShell>
 }

@@ -5,7 +5,8 @@ import { MarketingLayout, GuaranteePill } from '../components/layout'
 import { AppEntryButton, InstallPrompt } from '../components/InstallPrompt'
 import { MotionItem, Reveal, SecureSeal, Stagger } from '../components/motion'
 import { IMAGES, SITE } from '../data/site'
-import { categoryLabel, vendors } from '../data/vendors'
+import { categoryLabel } from '../data/vendors'
+import { useCatalog } from '../context/CatalogContext'
 import { easeOut, fadeUp, heroWord, hoverLift, springSoft, tapPress } from '../motion/tokens'
 
 const MotionLink = motion.create(Link)
@@ -37,6 +38,7 @@ function NeighbourhoodMarquee() {
 
 export function HomePage() {
   const reduce = useReducedMotion()
+  const { activeVendors } = useCatalog()
 
   return (
     <MarketingLayout transparentHeader showInstall>
@@ -289,7 +291,7 @@ export function HomePage() {
           </div>
 
           <Stagger className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4" as="ul" fast>
-            {vendors.map((vendor) => (
+            {activeVendors.map((vendor) => (
               <MotionItem key={vendor.id} as="li" variants={fadeUp}>
                 <MotionLink
                   to={appPath(`/vendors/${vendor.id}`)}

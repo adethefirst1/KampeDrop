@@ -13,12 +13,17 @@ export type Vendor = {
   name: string
   category: Category
   area: string
+  /** Where the buyer collects for self-pickup */
+  pickupSpot: string
   tagline: string
   etaMins: number
   rating: number
   orders: string
   accent: string
   vettedNote: string
+  phone: string
+  /** hidden from buyer browse when false */
+  active: boolean
   items: MenuItem[]
 }
 
@@ -31,18 +36,21 @@ export const categoryLabel: Record<Category, string> = {
   pharmacy: 'Pharmacy',
 }
 
-export const vendors: Vendor[] = [
+export const seedVendors: Vendor[] = [
   {
     id: 'mama-toke',
     name: 'Mama Toke Kitchen',
     category: 'food',
     area: 'Badagry Town',
+    pickupSpot: 'Hospital Road, near First Baptist — Mama Toke Kitchen',
     tagline: 'Lagoon-side jollof, pepper soup, and swallow that tastes like Sunday at home.',
     etaMins: 30,
     rating: 4.9,
     orders: '120+',
     accent: '#0E6B6B',
     vettedNote: 'Kitchen on Hospital Road. We ate there before onboarding.',
+    phone: '08034441001',
+    active: true,
     items: [
       {
         id: 'jollof',
@@ -77,12 +85,15 @@ export const vendors: Vendor[] = [
     name: 'Ajara Everyday Mart',
     category: 'mart',
     area: 'Ajara',
+    pickupSpot: 'Ajara Junction mart — ask for SureDrop counter',
     tagline: 'Rice, oil, eggs, detergent — the things Badagry homes actually run out of.',
     etaMins: 35,
     rating: 4.8,
     orders: '80+',
     accent: '#1A5F4A',
     vettedNote: 'Shelf-checked every week. We only list what’s in stock.',
+    phone: '08034441002',
+    active: true,
     items: [
       {
         id: 'rice5',
@@ -117,12 +128,15 @@ export const vendors: Vendor[] = [
     name: 'Ibereko Care Pharmacy',
     category: 'pharmacy',
     area: 'Ibereko',
+    pickupSpot: 'Ibereko Care Pharmacy — main counter, sealed packs',
     tagline: 'OTC essentials sealed and delivered — no roadside guessing on the Expressway.',
     etaMins: 40,
     rating: 4.9,
     orders: '60+',
     accent: '#146C5B',
     vettedNote: 'Licensed pharmacy partner. Sealed packs only.',
+    phone: '08034441003',
+    active: true,
     items: [
       {
         id: 'paracetamol',
@@ -156,12 +170,15 @@ export const vendors: Vendor[] = [
     name: 'Aradagun Express Grill',
     category: 'food',
     area: 'Aradagun',
+    pickupSpot: 'Aradagun Expressway side — green grill kiosk',
     tagline: 'Suya, asun, and cold zobo off the Badagry Expressway.',
     etaMins: 40,
     rating: 4.7,
     orders: '95+',
     accent: '#C45C26',
     vettedNote: 'Meat handled clean. Pickup window confirmed with riders.',
+    phone: '08034441004',
+    active: true,
     items: [
       {
         id: 'suya',
@@ -193,8 +210,50 @@ export const vendors: Vendor[] = [
   },
 ]
 
-export function getVendor(id: string) {
-  return vendors.find((v) => v.id === id)
+/** Static seed lookup — for ops mocks / first load. Live catalog is CatalogContext. */
+export function getSeedVendor(id: string) {
+  return seedVendors.find((v) => v.id === id)
+}
+
+export function slugifyVendorId(name: string) {
+  const base = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return base || `vendor-${Date.now()}`
+}
+
+export function slugifyItemId(name: string) {
+  return slugifyVendorId(name)
+}
+
+export const ACCENT_OPTIONS = [
+  '#0E6B6B',
+  '#1A5F4A',
+  '#146C5B',
+  '#C45C26',
+  '#8B4513',
+  '#2F4F4F',
+] as const
+
+export function emptyVendorDraft(name = 'New vendor'): Vendor {
+  return {
+    id: slugifyVendorId(name),
+    name,
+    category: 'food',
+    area: 'Badagry Town',
+    pickupSpot: '',
+    tagline: '',
+    etaMins: 35,
+    rating: 5,
+    orders: '0',
+    accent: ACCENT_OPTIONS[0],
+    vettedNote: '',
+    phone: '',
+    active: true,
+    items: [],
+  }
 }
 
 export function formatNaira(amount: number) {

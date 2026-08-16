@@ -7,6 +7,8 @@ export const SITE = {
   city: 'Lagos State',
   supportPhone: '+2348000000000',
   supportPhoneDisplay: '0800 000 0000',
+  /** digits only for wa.me */
+  supportWhatsApp: '2348000000000',
   email: 'hello@suredrop.ng',
   neighbourhoods: [
     'Badagry Town',
@@ -18,7 +20,22 @@ export const SITE = {
     'Iworo',
     'Agbara edge',
   ],
+  /**
+   * Escrow receiving account (Phase 1 manual transfer).
+   * Replace with real SureDrop account before pilot.
+   */
+  transferAccount: {
+    bankName: 'Providus Bank',
+    accountName: 'SureDrop Escrow',
+    accountNumber: '0000000000',
+    narrationHint: 'Use your order ID as narration',
+  },
+} as const
+
+export function whatsappHelpUrl(message: string) {
+  return `https://wa.me/${SITE.supportWhatsApp}?text=${encodeURIComponent(message)}`
 }
+
 
 /** Local brand photography — lagoon dusk, corridor, home kitchen */
 export const IMAGES = {

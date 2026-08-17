@@ -23,9 +23,11 @@ import {
   statusRank,
   furtherStatus,
 } from '../data/ops'
-import { fetchOrderById } from '../lib/ordersApi'
+import { fetchOrderById, type CloudOrder } from '../lib/ordersApi'
 import { formatNaira } from '../data/vendors'
 import { easeOut, springSnap } from '../motion/tokens'
+
+const TRACK_POLL_MS = 4000
 
 export function TrackPage() {
   const { orderId } = useParams()
@@ -37,7 +39,7 @@ export function TrackPage() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
-  const [cloudOrder, setCloudOrder] = useState<PlacedOrder | null>(null)
+  const [cloudOrder, setCloudOrder] = useState<CloudOrder | null>(null)
   const [cloudLoading, setCloudLoading] = useState(Boolean(orderId))
   const [cloudTried, setCloudTried] = useState(false)
 
@@ -47,7 +49,8 @@ export function TrackPage() {
     return loadOrder(orderId)
   }, [orderId, opsOrder, cloudOrder])
 
-  // Prefer Supabase RPC; local/session/ops only as fallback.
+  // Prefer Supabase RPC; poll so status + payment_state stay live for guests.
+  // Also re-pull when the tab becomes visible — background timers are throttled.
   useEffect(() => {
     if (!orderId) {
       setCloudOrder(null)
@@ -57,12 +60,14 @@ export function TrackPage() {
     }
 
     let cancelled = false
+    let isFirst = true
+    let timer: number | null = null
     setCloudLoading(true)
     setCloudTried(false)
     setCloudOrder(null)
 
-    void (async () => {
-      const result = await fetchOrderById(orderId)
+    async function pull() {
+      const result = await fetchOrderById(orderId!)
       if (cancelled) return
       if (result.ok) {
         setCloudOrder(result.order)
@@ -74,19 +79,43 @@ export function TrackPage() {
         } catch {
           /* ignore */
         }
-      } else {
+      } else if (isFirst) {
         setCloudOrder(null)
         console.warn(
           'Track: cloud fetch failed, using local fallback:',
           result.reason,
         )
       }
-      setCloudLoading(false)
-      setCloudTried(true)
-    })()
+      if (isFirst) {
+        setCloudLoading(false)
+        setCloudTried(true)
+        isFirst = false
+      }
+    }
+
+    function startPolling() {
+      if (timer != null) window.clearInterval(timer)
+      timer = window.setInterval(() => {
+        if (document.visibilityState === 'visible') void pull()
+      }, TRACK_POLL_MS)
+    }
+
+    function onVisible() {
+      if (document.visibilityState !== 'visible') return
+      void pull()
+      startPolling()
+    }
+
+    void pull()
+    startPolling()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
 
     return () => {
       cancelled = true
+      if (timer != null) window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
     }
   }, [orderId])
 
@@ -171,15 +200,21 @@ export function TrackPage() {
       fulfillment: baseOrder.fulfillment ?? 'delivery',
       status,
       passkey: opsOrder?.passkey ?? baseOrder.passkey,
-      escrowState: opsOrder?.escrowState ?? baseOrder.escrowState,
+      escrowState:
+        cloudOrder?.escrowState ??
+        opsOrder?.escrowState ??
+        baseOrder.escrowState,
     }
-  }, [baseOrder, status, opsOrder])
+  }, [baseOrder, status, opsOrder, cloudOrder?.escrowState])
+
+  const paymentState =
+    cloudOrder?.paymentState ?? opsOrder?.paymentState ?? undefined
 
   const fulfillment = order?.fulfillment ?? 'delivery'
   const pickup = fulfillment === 'pickup'
   const pipe = pipelineFor(fulfillment)
   const vendor = getVendor(order?.lines[0]?.vendorId ?? '')
-  const rider = getRider(opsOrder?.riderId ?? null)
+  const rider = getRider(cloudOrder?.riderId ?? opsOrder?.riderId ?? null)
   const cancelled = status === 'cancelled'
   const delivered = status === 'delivered'
   const activeIndex = cancelled ? -1 : statusRank(status, fulfillment)
@@ -370,8 +405,8 @@ export function TrackPage() {
           </p>
           <p className="mt-2 text-sm text-muted">
             {pickup
-              ? 'Show this code at the vendor when you collect. It confirms handoff and releases payment to the seller.'
-              : 'Share this code only when the rider picks up at the vendor. It confirms pickup and releases payment to the seller.'}
+              ? 'Show this code at the vendor when you collect. That vendor handoff releases escrow — not door arrival.'
+              : 'Share this only when the rider picks up at the vendor. That handoff releases escrow; door delivery stays tracked after.'}
           </p>
         </div>
       )}
@@ -389,7 +424,7 @@ export function TrackPage() {
             total: order.total,
             payment: order.payment,
             escrowState: order.escrowState,
-            paymentState: opsOrder?.paymentState,
+            paymentState,
           }}
           onClaimPaid={() => claimTransferPaid(order.id)}
         />
@@ -408,7 +443,7 @@ export function TrackPage() {
       <HelpGuaranteePanel
         orderId={order.id}
         status={status}
-        alreadyFlagged={opsOrder?.hasProblem}
+        alreadyFlagged={cloudOrder?.hasProblem || opsOrder?.hasProblem}
         onReport={(reason) => flagProblem(order.id, reason)}
       />
 

@@ -61,6 +61,19 @@ export type PlacedOrder = {
   placeLng: number | null
 }
 
+type PlaceOrderInput = {
+  customerName: string
+  phone: string
+  address: string
+  note: string
+  payment: 'cod' | 'transfer'
+  fulfillment: Fulfillment
+  placeName?: string | null
+  placeId?: string | null
+  placeLat?: number | null
+  placeLng?: number | null
+}
+
 type CartContextValue = {
   lines: CartLine[]
   vendor: Vendor | null
@@ -72,18 +85,11 @@ type CartContextValue = {
   setQty: (itemId: string, qty: number) => void
   clear: () => void
   lastOrder: PlacedOrder | null
-  placeOrder: (input: {
-    customerName: string
-    phone: string
-    address: string
-    note: string
-    payment: 'cod' | 'transfer'
-    fulfillment: Fulfillment
-    placeName?: string | null
-    placeId?: string | null
-    placeLat?: number | null
-    placeLng?: number | null
-  }) => PlacedOrder
+  /** Build order from cart without clearing (for cloud insert first). */
+  draftOrder: (input: PlaceOrderInput) => PlacedOrder
+  /** Persist buyer snapshot, set lastOrder, clear cart. */
+  commitOrder: (order: PlacedOrder) => void
+  placeOrder: (input: PlaceOrderInput) => PlacedOrder
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
@@ -132,19 +138,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clear = useCallback(() => setLines([]), [])
 
-  const placeOrder = useCallback(
-    (input: {
-      customerName: string
-      phone: string
-      address: string
-      note: string
-      payment: 'cod' | 'transfer'
-      fulfillment: Fulfillment
-      placeName?: string | null
-      placeId?: string | null
-      placeLat?: number | null
-      placeLng?: number | null
-    }) => {
+  const draftOrder = useCallback(
+    (input: PlaceOrderInput) => {
       const subtotal = lines.reduce((sum, l) => sum + l.item.price * l.qty, 0)
       const fulfillment = input.fulfillment
       const deliveryFee = fulfillment === 'pickup' ? 0 : DELIVERY_FEE
@@ -171,16 +166,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
         placeLat: input.placeLat ?? null,
         placeLng: input.placeLng ?? null,
       }
-      try {
-        sessionStorage.setItem(`suredrop-order-${order.id}`, JSON.stringify(order))
-      } catch {
-        /* ignore */
-      }
-      setLastOrder(order)
-      setLines([])
       return order
     },
     [lines],
+  )
+
+  const commitOrder = useCallback((order: PlacedOrder) => {
+    try {
+      sessionStorage.setItem(`suredrop-order-${order.id}`, JSON.stringify(order))
+    } catch {
+      /* ignore */
+    }
+    setLastOrder(order)
+    setLines([])
+  }, [])
+
+  const placeOrder = useCallback(
+    (input: PlaceOrderInput) => {
+      const order = draftOrder(input)
+      commitOrder(order)
+      return order
+    },
+    [draftOrder, commitOrder],
   )
 
   const subtotal = useMemo(
@@ -202,6 +209,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setQty,
       clear,
       lastOrder,
+      draftOrder,
+      commitOrder,
       placeOrder,
     }),
     [
@@ -214,6 +223,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setQty,
       clear,
       lastOrder,
+      draftOrder,
+      commitOrder,
       placeOrder,
     ],
   )

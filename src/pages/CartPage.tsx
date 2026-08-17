@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import { appPath } from '../paths'
 import { OrderLayout, StickyCommerceBar } from '../components/layout'
 import { useCart } from '../context/CartContext'
+import { useCatalog } from '../context/CatalogContext'
+import { labelForStatus } from '../data/ops'
 import { formatNaira } from '../data/vendors'
 
 export function CartPage() {
@@ -16,8 +18,17 @@ export function CartPage() {
     itemCount,
     lastOrder,
   } = useCart()
+  const { getVendor } = useCatalog()
 
   if (!itemCount) {
+    const lastVendor = lastOrder
+      ? getVendor(lastOrder.lines[0]?.vendorId ?? '')
+      : null
+    const lastFulfillment = lastOrder?.fulfillment ?? 'delivery'
+    const lastDone =
+      lastOrder?.status === 'delivered' || lastOrder?.status === 'cancelled'
+    const firstName = lastOrder?.customerName.trim().split(/\s+/)[0]
+
     return (
       <OrderLayout>
         <div className="py-16 text-center">
@@ -31,12 +42,26 @@ export function CartPage() {
           <Link to={appPath()} className="btn-primary mt-8">
             Browse vendors
           </Link>
+
           {lastOrder && (
             <Link
               to={appPath(`/orders/${lastOrder.id}`)}
-              className="mt-4 block text-sm font-semibold text-lagoon"
+              className="mx-auto mt-10 block max-w-sm rounded-[1.35rem] bg-paper p-4 text-left ring-1 ring-line transition hover:ring-lagoon/40"
             >
-              Track last order ({lastOrder.id})
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-lagoon">
+                {lastDone ? 'Your last order' : 'Order in progress'}
+              </p>
+              <p className="mt-2 font-display text-xl font-semibold tracking-[-0.02em] text-ink">
+                {lastVendor?.name ?? 'SureDrop order'}
+              </p>
+              <p className="mt-1 text-sm leading-snug text-muted">
+                {firstName ? `For ${firstName} · ` : ''}
+                {labelForStatus(lastOrder.status, lastFulfillment)}
+                {lastFulfillment === 'pickup' ? ' · Pickup' : ' · Delivery'}
+              </p>
+              <span className="mt-3 inline-flex text-sm font-bold text-lagoon-deep">
+                {lastDone ? 'View order' : 'Continue tracking'} →
+              </span>
             </Link>
           )}
         </div>

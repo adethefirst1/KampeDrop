@@ -27,10 +27,9 @@ export function HelpGuaranteePanel({
   const [issue, setIssue] = useState<(typeof ISSUES)[number]['id']>('late')
   const [sent, setSent] = useState(false)
 
-  const postPickup =
+  const afterVendorHandoff =
     status === 'picked_up' ||
     status === 'on_the_way' ||
-    status === 'ready_for_pickup' ||
     status === 'delivered'
 
   const wa = whatsappHelpUrl(
@@ -50,8 +49,8 @@ export function HelpGuaranteePanel({
         Need help
       </p>
       <p className="mt-2 text-sm text-muted">
-        {postPickup
-          ? 'After pickup, use the SureDrop Guarantee — we’ll make it right.'
+        {afterVendorHandoff
+          ? 'Vendor handoff is done (passkey). Door delivery issues still get the SureDrop Guarantee — we’ll make it right.'
           : 'Talk to a human, or report an issue on this order.'}
       </p>
 

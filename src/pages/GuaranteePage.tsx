@@ -15,8 +15,9 @@ export function GuaranteePage() {
             Wrong or late — we make it right.
           </h1>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-white/70">
-            The guarantee isn’t fine print. It’s why SureDrop exists for Badagry homes — from Town
-            to Ajara and along the Expressway.
+            For transfer orders, payment stays held until your passkey confirms the order
+            left the vendor with a vetted rider — or you collected it yourself. If something’s
+            wrong after that, contact us — we’ll make it right.
           </p>
         </div>
       </section>
@@ -25,8 +26,8 @@ export function GuaranteePage() {
         <div className="container-site grid gap-6 md:grid-cols-3">
           {[
             {
-              t: 'Confirmed',
-              d: 'You get instant confirmation the moment an order is placed. No guessing.',
+              t: 'Held until vendor handoff',
+              d: 'Transfer stays in escrow until your 4-digit passkey confirms pickup at the vendor or your own collection — not until the rider reaches your door.',
             },
             {
               t: 'Tracked',
@@ -34,7 +35,7 @@ export function GuaranteePage() {
             },
             {
               t: 'Made right',
-              d: 'If the order arrives wrong or late, we fix it — refund, replace, or redeliver.',
+              d: 'Late, wrong, or missing — report a problem on your order and a human follows up.',
             },
           ].map((item) => (
             <div key={item.t} className="rounded-[1.75rem] bg-paper p-6 ring-1 ring-line">
@@ -53,8 +54,8 @@ export function GuaranteePage() {
           <ul className="mt-8 space-y-5 text-base leading-relaxed text-muted">
             <li>
               <span className="font-bold text-ink">Late delivery — </span>
-              We own the delay. You’ll hear from a real person, and we’ll adjust or refund the
-              delivery fee.
+              We own the delay. You’ll hear from a real person, and we’ll adjust or refund where
+              appropriate.
             </li>
             <li>
               <span className="font-bold text-ink">Wrong or missing item — </span>
@@ -62,16 +63,21 @@ export function GuaranteePage() {
             </li>
             <li>
               <span className="font-bold text-ink">Need help — </span>
-              Call or message us. A human answers. Not a bot maze.
+              Call or WhatsApp us. A human answers. Not a bot maze.
             </li>
           </ul>
           <p className="mt-10 text-sm text-muted">
-            Pilot note: during our {SITE.area} launch, every order on SureDrop is covered. Orders
-            arranged outside SureDrop are not.
+            Pilot note: during our {SITE.area} launch, every order placed on SureDrop is covered.
+            Arrangements made outside SureDrop are not.
           </p>
-          <Link to={appPath()} className="btn-ink mt-8">
-            Order with the guarantee
-          </Link>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link to={appPath()} className="btn-ink">
+              Order with the guarantee
+            </Link>
+            <Link to="/terms" className="btn-primary">
+              Full terms &amp; policy
+            </Link>
+          </div>
         </div>
       </section>
     </MarketingLayout>

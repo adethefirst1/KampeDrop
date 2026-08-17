@@ -5,11 +5,12 @@ export const SITE = {
   area: 'Badagry',
   areaLong: 'Badagry Town and along the Expressway',
   city: 'Lagos State',
-  supportPhone: '+2348000000000',
-  supportPhoneDisplay: '0800 000 0000',
+  supportPhone: '+2348038617226',
+  supportPhoneDisplay: '0803 861 7226',
   /** digits only for wa.me */
-  supportWhatsApp: '2348000000000',
-  email: 'hello@suredrop.ng',
+  supportWhatsApp: '2348076283611',
+  supportWhatsAppDisplay: '0807 628 3611',
+  email: 'suredropltd@gmail.com',
   neighbourhoods: [
     'Badagry Town',
     'Ajara',
@@ -35,7 +36,6 @@ export const SITE = {
 export function whatsappHelpUrl(message: string) {
   return `https://wa.me/${SITE.supportWhatsApp}?text=${encodeURIComponent(message)}`
 }
-
 
 /** Local brand photography — lagoon dusk, corridor, home kitchen */
 export const IMAGES = {

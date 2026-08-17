@@ -24,6 +24,7 @@ import {
   fetchAllOrdersFromSupabase,
   opsOrderToPatch,
   updateOrderInSupabase,
+  validatePasskeyAndRelease,
 } from '../lib/ordersApi'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 
@@ -40,7 +41,7 @@ type OpsContextValue = {
   orders: OpsOrder[]
   ordersLoading: boolean
   ordersError: string | null
-  refreshOrders: () => Promise<void>
+  refreshOrders: (opts?: { quiet?: boolean }) => Promise<void>
   getOrder: (id: string) => OpsOrder | undefined
   ingestPlacedOrder: (order: PlacedOrder) => void
   setStatus: (id: string, status: OrderStatus) => void
@@ -51,7 +52,7 @@ type OpsContextValue = {
   validatePickup: (
     id: string,
     passkey: string,
-  ) => { ok: true } | { ok: false; reason: string }
+  ) => Promise<{ ok: true } | { ok: false; reason: string }>
   markOnTheWay: (id: string) => void
   markDelivered: (id: string) => void
   cancelOrder: (
@@ -59,7 +60,9 @@ type OpsContextValue = {
     reason: string,
   ) => { ok: true } | { ok: false; reason: string }
   claimTransferPaid: (id: string) => { ok: true } | { ok: false; reason: string }
-  confirmTransfer: (id: string) => { ok: true } | { ok: false; reason: string }
+  confirmTransfer: (
+    id: string,
+  ) => Promise<{ ok: true } | { ok: false; reason: string }>
   setPaymentState: (id: string, state: OpsOrder['paymentState']) => void
   flagProblem: (id: string, reason: string) => void
   clearProblem: (id: string) => void
@@ -96,14 +99,14 @@ export function OpsProvider({ children }: { children: ReactNode }) {
 
   const authenticated = Boolean(user)
 
-  const refreshOrders = useCallback(async () => {
+  const refreshOrders = useCallback(async (opts?: { quiet?: boolean }) => {
     if (!user) {
       setOrders([])
       return
     }
-    setOrdersLoading(true)
+    if (!opts?.quiet) setOrdersLoading(true)
     const result = await fetchAllOrdersFromSupabase()
-    setOrdersLoading(false)
+    if (!opts?.quiet) setOrdersLoading(false)
     if (!result.ok) {
       setOrdersError(result.reason)
       return
@@ -141,18 +144,41 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Load + poll orders while ops is signed in
+  // Load + poll orders while ops is signed in; re-pull when tab is focused.
   useEffect(() => {
     if (!user) {
       setOrders([])
       setOrdersError(null)
       return
     }
+
+    let poll: number | null = null
+
+    function startPolling() {
+      if (poll != null) window.clearInterval(poll)
+      poll = window.setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          void refreshOrders({ quiet: true })
+        }
+      }, 4000)
+    }
+
+    function onVisible() {
+      if (document.visibilityState !== 'visible') return
+      void refreshOrders({ quiet: true })
+      startPolling()
+    }
+
     void refreshOrders()
-    const poll = window.setInterval(() => {
-      void refreshOrders()
-    }, 4000)
-    return () => window.clearInterval(poll)
+    startPolling()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+
+    return () => {
+      if (poll != null) window.clearInterval(poll)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
   }, [user, refreshOrders])
 
   const login = useCallback(async (email: string, password: string) => {
@@ -382,83 +408,40 @@ export function OpsProvider({ children }: { children: ReactNode }) {
   )
 
   const validatePickup = useCallback(
-    (id: string, passkey: string) => {
-      let result: { ok: true } | { ok: false; reason: string } = { ok: true }
-      updateOrder(id, (o) => {
-        if (o.status === 'cancelled') {
-          result = { ok: false, reason: 'Order is cancelled.' }
-          return o
-        }
-        if (passkey.trim() !== o.passkey) {
-          result = { ok: false, reason: 'Wrong passkey.' }
-          return o
-        }
+    async (id: string, passkey: string) => {
+      const trimmed = passkey.trim()
+      if (!/^\d{4}$/.test(trimmed)) {
+        return { ok: false as const, reason: 'Enter the 4-digit passkey.' }
+      }
 
-        if (o.fulfillment === 'pickup') {
-          if (o.status !== 'ready_for_pickup' && o.status !== 'preparing') {
-            if (o.status === 'delivered') {
-              result = { ok: false, reason: 'Already collected.' }
-              return o
-            }
-            result = {
-              ok: false,
-              reason: 'Mark ready for pickup before collecting.',
-            }
-            return o
-          }
-          return {
-            ...o,
-            status: 'delivered',
-            escrowState: o.payment === 'cod' ? 'cod' : 'released',
-            paymentState: o.payment === 'cod' ? 'cod' : 'released',
-            notes: [
-              ...o.notes,
-              note(
-                o.payment === 'cod'
-                  ? 'Passkey OK — customer collected. COD paid at vendor.'
-                  : 'Passkey OK — customer collected. Escrow released to vendor.',
-              ),
-            ],
-          }
-        }
+      const cloud = await validatePasskeyAndRelease(id, trimmed)
+      if (!cloud.ok) {
+        return { ok: false as const, reason: cloud.reason }
+      }
 
-        if (!o.riderId) {
-          result = { ok: false, reason: 'Assign a rider first.' }
-          return o
-        }
-        if (o.status !== 'preparing' && o.status !== 'rider_assigned') {
-          if (
-            o.status === 'picked_up' ||
-            o.status === 'on_the_way' ||
-            o.status === 'delivered'
-          ) {
-            result = { ok: false, reason: 'Already picked up.' }
-            return o
-          }
-          result = {
-            ok: false,
-            reason: 'Mark preparing (kitchen started) before pickup.',
-          }
-          return o
-        }
-        return {
-          ...o,
-          status: 'picked_up',
-          escrowState: o.payment === 'cod' ? 'cod' : 'released',
-          paymentState: o.payment === 'cod' ? 'cod' : 'released',
-          notes: [
-            ...o.notes,
-            note(
-              o.payment === 'cod'
-                ? 'Passkey OK — picked up. COD: collect from buyer.'
-                : 'Passkey OK — picked up. Escrow released to vendor (Paystack).',
-            ),
-          ],
-        }
+      setOrders((prev) => {
+        const exists = prev.some((o) => o.id === id)
+        if (!exists) return [cloud.order, ...prev]
+        return prev.map((o) =>
+          o.id === id
+            ? {
+                ...cloud.order,
+                notes: [
+                  ...o.notes,
+                  note(
+                    cloud.order.payment === 'cod'
+                      ? 'Passkey OK — handoff confirmed (COD).'
+                      : 'Passkey OK — handoff confirmed. Escrow released via validate_passkey_and_release.',
+                  ),
+                ],
+              }
+            : o,
+        )
       })
-      return result
+      syncBuyerOrder(cloud.order)
+      return { ok: true as const }
     },
-    [updateOrder],
+    [],
   )
 
   const markOnTheWay = useCallback(
@@ -596,36 +579,44 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     [updateOrder],
   )
 
-  const confirmTransfer = useCallback(
-    (id: string) => {
-      let result: { ok: true } | { ok: false; reason: string } = { ok: true }
-      updateOrder(id, (o) => {
-        if (o.payment !== 'transfer') {
-          result = { ok: false, reason: 'Not a transfer order.' }
-          return o
-        }
-        if (o.status === 'cancelled') {
-          result = { ok: false, reason: 'Order is cancelled.' }
-          return o
-        }
-        return {
-          ...o,
-          paymentState: 'transfer_confirmed',
-          escrowState: 'held',
-          notes: [
-            ...o.notes,
-            note(
-              o.fulfillment === 'pickup'
-                ? 'Transfer confirmed in escrow. Safe to tell kitchen to start.'
-                : 'Transfer confirmed in escrow. Safe to assign rider / start kitchen after rider accepts.',
-            ),
-          ],
-        }
-      })
-      return result
-    },
-    [updateOrder],
-  )
+  const confirmTransfer = useCallback(async (id: string) => {
+    const current = ordersRef.current.find((o) => o.id === id)
+    if (!current) {
+      return { ok: false as const, reason: 'Order not found in ops inbox.' }
+    }
+    if (current.payment !== 'transfer') {
+      return { ok: false as const, reason: 'Not a transfer order.' }
+    }
+    if (current.status === 'cancelled') {
+      return { ok: false as const, reason: 'Order is cancelled.' }
+    }
+
+    const updated: OpsOrder = {
+      ...current,
+      paymentState: 'transfer_confirmed',
+      escrowState: 'held',
+      notes: [
+        ...current.notes,
+        note(
+          current.fulfillment === 'pickup'
+            ? 'Transfer confirmed in escrow. Safe to tell kitchen to start.'
+            : 'Transfer confirmed in escrow. Safe to assign rider / start kitchen after rider accepts.',
+        ),
+      ],
+    }
+
+    const cloud = await updateOrderInSupabase(id, opsOrderToPatch(updated))
+    if (!cloud.ok) {
+      return {
+        ok: false as const,
+        reason: cloud.reason || 'Cloud update failed — transfer was not confirmed.',
+      }
+    }
+
+    setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)))
+    syncBuyerOrder(updated)
+    return { ok: true as const }
+  }, [])
 
   const setPaymentState = useCallback(
     (id: string, state: OpsOrder['paymentState']) => {

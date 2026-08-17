@@ -15,9 +15,11 @@ import { BrowsePage } from './pages/BrowsePage'
 import { VendorPage } from './pages/VendorPage'
 import { CartPage } from './pages/CartPage'
 import { CheckoutPage } from './pages/CheckoutPage'
+import { OrderConfirmedPage } from './pages/OrderConfirmedPage'
 import { TrackPage } from './pages/TrackPage'
 import { HowPage } from './pages/HowPage'
 import { GuaranteePage } from './pages/GuaranteePage'
+import { TermsPage } from './pages/TermsPage'
 import {
   AdminInboxPage,
   AdminLoginPage,
@@ -36,7 +38,8 @@ function StandaloneGate({ children }: { children: ReactNode }) {
   const marketing =
     location.pathname === '/' ||
     location.pathname === '/how' ||
-    location.pathname === '/guarantee'
+    location.pathname === '/guarantee' ||
+    location.pathname === '/terms'
 
   if (isStandaloneDisplay() && marketing) {
     return <Navigate to={APP_BASE} replace />
@@ -52,11 +55,16 @@ function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/how" element={<HowPage />} />
         <Route path="/guarantee" element={<GuaranteePage />} />
+        <Route path="/terms" element={<TermsPage />} />
 
         <Route path={APP_BASE} element={<BrowsePage />} />
         <Route path={`${APP_BASE}/vendors/:vendorId`} element={<VendorPage />} />
         <Route path={`${APP_BASE}/cart`} element={<CartPage />} />
         <Route path={`${APP_BASE}/checkout`} element={<CheckoutPage />} />
+        <Route
+          path={`${APP_BASE}/orders/:orderId/confirmed`}
+          element={<OrderConfirmedPage />}
+        />
         <Route path={`${APP_BASE}/orders/:orderId`} element={<TrackPage />} />
 
         <Route path="/admin/login" element={<AdminLoginPage />} />

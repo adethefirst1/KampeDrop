@@ -377,6 +377,13 @@ export function AdminOrderPage() {
     setActionError(result.ok ? null : result.reason)
   }
 
+  async function runAsync(
+    promise: Promise<{ ok: true } | { ok: false; reason: string }>,
+  ) {
+    const result = await promise
+    setActionError(result.ok ? null : result.reason)
+  }
+
   return (
     <RequireOps>
       <Link to="/admin" className="text-sm font-semibold text-muted hover:text-ink">
@@ -538,6 +545,9 @@ export function AdminOrderPage() {
               <p className="text-xs font-bold uppercase tracking-wide text-white/45">
                 Validate pickup passkey
               </p>
+              <p className="text-sm text-white/70">
+                Ask the buyer for their 4-digit code
+              </p>
               <div className="flex gap-2">
                 <input
                   value={passInput}
@@ -546,20 +556,17 @@ export function AdminOrderPage() {
                   }
                   placeholder="4-digit code"
                   inputMode="numeric"
+                  autoComplete="one-time-code"
                   className="field flex-1 !bg-white/10 !text-white !ring-white/20 placeholder:!text-white/35"
                 />
                 <button
                   type="button"
-                  onClick={() => run(validatePickup(order.id, passInput))}
+                  onClick={() => void runAsync(validatePickup(order.id, passInput))}
                   className="btn-primary !px-4"
                 >
                   Confirm pickup
                 </button>
               </div>
-              <p className="text-xs text-white/45">
-                Buyer code on track:{' '}
-                <span className="font-bold text-white">{order.passkey}</span>
-              </p>
             </div>
           )}
 
@@ -570,6 +577,9 @@ export function AdminOrderPage() {
               <p className="text-xs font-bold uppercase tracking-wide text-white/45">
                 Validate collection passkey
               </p>
+              <p className="text-sm text-white/70">
+                Ask the buyer for their 4-digit code
+              </p>
               <div className="flex gap-2">
                 <input
                   value={passInput}
@@ -578,20 +588,17 @@ export function AdminOrderPage() {
                   }
                   placeholder="4-digit code"
                   inputMode="numeric"
+                  autoComplete="one-time-code"
                   className="field flex-1 !bg-white/10 !text-white !ring-white/20 placeholder:!text-white/35"
                 />
                 <button
                   type="button"
-                  onClick={() => run(validatePickup(order.id, passInput))}
+                  onClick={() => void runAsync(validatePickup(order.id, passInput))}
                   className="btn-primary !px-4"
                 >
                   Confirm collected
                 </button>
               </div>
-              <p className="text-xs text-white/45">
-                Buyer code on track:{' '}
-                <span className="font-bold text-white">{order.passkey}</span>
-              </p>
             </div>
           )}
 
@@ -646,7 +653,7 @@ export function AdminOrderPage() {
                 <button
                   type="button"
                   className="btn-primary !px-4 !py-2 text-sm"
-                  onClick={() => run(confirmTransfer(order.id))}
+                  onClick={() => void runAsync(confirmTransfer(order.id))}
                 >
                   Confirm transfer received
                 </button>
@@ -661,12 +668,17 @@ export function AdminOrderPage() {
                 <button
                   type="button"
                   className="rounded-xl bg-mist px-4 py-2 text-sm font-bold ring-1 ring-line"
-                  onClick={() => run(confirmTransfer(order.id))}
+                  onClick={() => void runAsync(confirmTransfer(order.id))}
                 >
-                  Confirm anyway
+                  Confirm transfer anyway
                 </button>
               )}
             </div>
+            {actionError && (
+              <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                {actionError}
+              </p>
+            )}
           </div>
         )}
         <p className="mt-2 text-xs text-muted">
@@ -750,9 +762,6 @@ export function AdminOrderPage() {
         {order.note && (
           <p className="mt-2 rounded-xl bg-mist px-3 py-2 text-sm">Note: {order.note}</p>
         )}
-        <p className="mt-3 text-xs font-bold text-muted">
-          Passkey · <span className="font-display text-lg text-ink">{order.passkey}</span>
-        </p>
       </section>
 
       {/* Items */}

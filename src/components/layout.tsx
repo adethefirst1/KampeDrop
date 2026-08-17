@@ -55,6 +55,7 @@ const marketingNav = [
   { to: appPath(), label: 'Order' },
   { to: '/how', label: 'How it works' },
   { to: '/guarantee', label: 'Guarantee' },
+  { to: '/terms', label: 'Terms' },
 ]
 
 export function MarketingHeader({ transparent = false }: { transparent?: boolean }) {
@@ -209,6 +210,11 @@ export function SiteFooter() {
                 Guarantee
               </Link>
             </li>
+            <li>
+              <Link to="/terms" className="hover:text-white">
+                Terms
+              </Link>
+            </li>
           </ul>
         </div>
         <div>
@@ -352,32 +358,49 @@ export function AppShell({
   children,
   narrow = false,
   showInstallTip,
+  bleed = false,
 }: {
   children: ReactNode
   narrow?: boolean
   /** Default: only on browse home to keep commerce screens clean */
   showInstallTip?: boolean
+  /** Edge-to-edge main (no mist wash / container) — confirmation moments */
+  bleed?: boolean
 }) {
   const { pathname } = useLocation()
   const tip =
     showInstallTip ?? (pathname === APP_BASE || pathname === `${APP_BASE}/`)
 
   return (
-    <div className="min-h-svh mist-wash text-ink">
+    <div className={`min-h-svh text-ink ${bleed ? 'bg-ink' : 'mist-wash'}`}>
       <AppHeader />
       <main
-        className={`min-h-[70svh] pb-28 pt-4 ${
-          narrow ? 'container-narrow' : 'mx-auto max-w-lg px-4 md:max-w-3xl'
-        }`}
+        className={
+          bleed
+            ? 'min-h-[calc(100svh-3.5rem)] p-0'
+            : `min-h-[70svh] pb-28 pt-4 ${
+                narrow ? 'container-narrow' : 'mx-auto max-w-lg px-4 md:max-w-3xl'
+              }`
+        }
       >
         {tip && <InAppInstallTip />}
         {children}
       </main>
-      <BottomCartBar />
+      {!bleed && <BottomCartBar />}
     </div>
   )
 }
 
-export function OrderLayout({ children }: { children: ReactNode }) {
-  return <AppShell narrow showInstallTip={false}>{children}</AppShell>
+export function OrderLayout({
+  children,
+  bleed = false,
+}: {
+  children: ReactNode
+  bleed?: boolean
+}) {
+  return (
+    <AppShell narrow={!bleed} bleed={bleed} showInstallTip={false}>
+      {children}
+    </AppShell>
+  )
 }

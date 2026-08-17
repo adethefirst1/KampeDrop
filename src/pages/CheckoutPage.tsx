@@ -7,10 +7,10 @@ import { useCart, type Fulfillment } from '../context/CartContext'
 import { useOps } from '../context/OpsContext'
 import type { DeliveryPlace } from '../data/places'
 import { DELIVERY_FEE, formatNaira } from '../data/vendors'
-import { saveOrderToSupabase } from '../lib/ordersApi'
+import { isOrderRateLimitError, saveOrderToSupabase } from '../lib/ordersApi'
 
 export function CheckoutPage() {
-  const { itemCount, subtotal, vendor, placeOrder } = useCart()
+  const { itemCount, subtotal, vendor, draftOrder, commitOrder } = useCart()
   const { ingestPlacedOrder } = useOps()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -21,13 +21,14 @@ export function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false)
   const [placedId, setPlacedId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const deliveryFee = fulfillment === 'pickup' ? 0 : DELIVERY_FEE
   const total = subtotal + deliveryFee
   const pickup = fulfillment === 'pickup'
 
   if (placedId) {
-    return <Navigate to={appPath(`/orders/${placedId}`)} replace />
+    return <Navigate to={appPath(`/orders/${placedId}/confirmed`)} replace />
   }
 
   if (!itemCount) {
@@ -45,11 +46,12 @@ export function CheckoutPage() {
     }
     setSubmitting(true)
     setPlaceError(false)
+    setSubmitError(null)
     try {
       const pickupAddress =
         vendor?.pickupSpot ||
         `${vendor?.area ?? 'Badagry'} — ${vendor?.name ?? 'vendor'}`
-      const order = placeOrder({
+      const order = draftOrder({
         customerName: name.trim(),
         phone: phone.trim(),
         address: pickup ? pickupAddress : place!.address.trim(),
@@ -61,18 +63,29 @@ export function CheckoutPage() {
         placeLat: pickup ? null : place?.lat,
         placeLng: pickup ? null : place?.lng,
       })
-      ingestPlacedOrder(order)
 
       const cloud = await saveOrderToSupabase(order)
       if (!cloud.ok) {
         console.error('Supabase save failed:', cloud.reason)
-        window.alert(
-          `Order placed locally, but cloud save failed:\n\n${cloud.reason}\n\nCheck .env keys, table columns, and RLS policies.`,
-        )
+        if (isOrderRateLimitError(cloud.reason)) {
+          setSubmitError(
+            'Too many orders from this number recently — please wait a few minutes and try again, or contact support',
+          )
+        } else {
+          setSubmitError(
+            cloud.reason ||
+              'Could not place your order right now. Please try again.',
+          )
+        }
+        setSubmitting(false)
+        return
       }
 
+      commitOrder(order)
+      ingestPlacedOrder(order)
       setPlacedId(order.id)
     } catch {
+      setSubmitError('Could not place your order right now. Please try again.')
       setSubmitting(false)
     }
   }
@@ -226,7 +239,7 @@ export function CheckoutPage() {
                 {
                   id: 'transfer' as const,
                   title: 'Bank transfer',
-                  hint: pickup ? 'Held until collect' : 'Held until pickup',
+                  hint: pickup ? 'Held until you collect' : 'Held until vendor pickup',
                 },
                 {
                   id: 'cod' as const,
@@ -266,10 +279,22 @@ export function CheckoutPage() {
             <p className="mt-2 text-xs leading-relaxed text-muted">
               You’ll get bank details on the next screen. Transfer to SureDrop
               escrow — vendor is paid only after{' '}
-              {pickup ? 'you collect' : 'pickup'}.
+              {pickup
+                ? 'you collect with your passkey'
+                : 'the rider collects at the vendor (passkey)'}
+              .
             </p>
           )}
         </fieldset>
+
+        {submitError && (
+          <p
+            className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+            role="alert"
+          >
+            {submitError}
+          </p>
+        )}
 
         <div className="h-28" aria-hidden />
       </form>

@@ -97,10 +97,10 @@ export const statusFeel: Partial<Record<OrderStatus, string>> = {
   rider_assigned: 'Rider locked. Kitchen can start preparing.',
   confirmed: 'Order confirmed. Kitchen can start — no rider needed.',
   preparing: 'Vendor is preparing your order.',
-  ready_for_pickup: 'Ready at the vendor. Bring your passkey to collect.',
-  picked_up: 'Passkey checked — vendor paid. Heading your way.',
-  on_the_way: 'Rider is moving toward you.',
-  delivered: 'Secured at your door.',
+  ready_for_pickup: 'Ready at the vendor. Bring your passkey to collect — that releases escrow.',
+  picked_up: 'Passkey checked at the vendor — escrow released. Rider heading your way.',
+  on_the_way: 'Rider is moving toward you. Escrow already released at vendor pickup.',
+  delivered: 'Arrived at your door.',
   cancelled: 'Order cancelled. Payment refunded or released from hold.',
 }
 
@@ -116,10 +116,10 @@ export function feelForStatus(
       return 'Vendor is preparing your order for pickup.'
     }
     if (status === 'ready_for_pickup') {
-      return 'Ready at the counter. Show your passkey to collect.'
+      return 'Ready at the counter. Show your passkey to collect — that releases escrow.'
     }
     if (status === 'delivered') {
-      return 'Collected — enjoy.'
+      return 'Collected with passkey — escrow released. Enjoy.'
     }
   }
   return statusFeel[status] ?? ''

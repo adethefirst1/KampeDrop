@@ -104,7 +104,7 @@ export function TransferPayPanel({ order, onClaimPaid }: Props) {
 
       {confirmed && (
         <p className="mt-4 rounded-xl bg-lagoon/15 px-3 py-2 text-sm font-semibold text-lagoon-deep">
-          Transfer confirmed. Payment held until pickup.
+          Transfer confirmed. Payment held until vendor handoff (passkey).
         </p>
       )}
 

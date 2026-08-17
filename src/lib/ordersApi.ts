@@ -94,6 +94,25 @@ export function rowToPlacedOrder(row: OrderRow): PlacedOrder {
   }
 }
 
+/** Guest track payload: placed order + live payment / problem fields from cloud. */
+export type CloudOrder = PlacedOrder & {
+  paymentState: OpsOrder['paymentState']
+  hasProblem: boolean
+  riderId: string | null
+}
+
+export function rowToCloudOrder(row: OrderRow): CloudOrder {
+  const placed = rowToPlacedOrder(row)
+  return {
+    ...placed,
+    paymentState:
+      (row.payment_state as OpsOrder['paymentState']) ||
+      (placed.payment === 'cod' ? 'cod' : 'transfer_pending'),
+    hasProblem: Boolean(row.has_problem),
+    riderId: row.rider_id,
+  }
+}
+
 /**
  * Save a placed order to Supabase.
  * Dual-write: local cart/ops still work; this makes the order visible in the cloud.
@@ -123,13 +142,22 @@ export async function saveOrderToSupabase(
   return { ok: true }
 }
 
+/** True when Postgres rate-limit trigger rejected the insert. */
+export function isOrderRateLimitError(message: string) {
+  const m = message.toLowerCase()
+  return (
+    m.includes('too many orders from this number') ||
+    m.includes('too many orders')
+  )
+}
+
 /**
  * Load one order by id via get_order_by_id RPC (guest-safe; no full table list).
  */
 export async function fetchOrderById(
   orderId: string,
 ): Promise<
-  | { ok: true; order: PlacedOrder }
+  | { ok: true; order: CloudOrder }
   | { ok: false; reason: string; order: null }
 > {
   if (!orderId.trim()) {
@@ -162,7 +190,7 @@ export async function fetchOrderById(
     return { ok: false, reason: 'Order not found in cloud.', order: null }
   }
 
-  return { ok: true, order: rowToPlacedOrder(row as OrderRow) }
+  return { ok: true, order: rowToCloudOrder(row as OrderRow) }
 }
 
 export function rowToOpsOrder(row: OrderRow): OpsOrder {
@@ -238,12 +266,48 @@ export async function updateOrderInSupabase(
     return { ok: false, reason: 'Supabase is not configured.' }
   }
 
-  const { error } = await supabase.from('orders').update(patch).eq('id', id)
+  // Never push escrow/payment "released" from the client — only via
+  // validate_passkey_and_release RPC (DB trigger also rejects this).
+  const safe: OrderPatch = { ...patch }
+  if (safe.escrow_state === 'released') delete safe.escrow_state
+  if (safe.payment_state === 'released') delete safe.payment_state
+
+  const { error } = await supabase.from('orders').update(safe).eq('id', id)
 
   if (error) {
     return { ok: false, reason: error.message }
   }
   return { ok: true }
+}
+
+/**
+ * Ops passkey confirm + escrow release (SECURITY DEFINER RPC).
+ * Only authenticated callers should be granted EXECUTE.
+ */
+export async function validatePasskeyAndRelease(
+  orderId: string,
+  passkey: string,
+): Promise<{ ok: true; order: OpsOrder } | { ok: false; reason: string }> {
+  const supabase = getSupabase()
+  if (!supabase) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+
+  const { data, error } = await supabase.rpc('validate_passkey_and_release', {
+    p_id: orderId,
+    p_passkey: passkey.trim(),
+  })
+
+  if (error) {
+    return { ok: false, reason: error.message }
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || typeof row !== 'object') {
+    return { ok: false, reason: 'Passkey validation returned no order.' }
+  }
+
+  return { ok: true, order: rowToOpsOrder(row as OrderRow) }
 }
 
 /**

@@ -6,13 +6,20 @@ import { hoverLift, springPop, springWobble, tapPress } from '../motion/tokens'
 
 const MotionLink = motion.create(Link)
 
-const STICKERS = [
+const STICKERS: Array<{
+  label: string
+  bg: string
+  rot: number
+  x: string
+  y: string
+  ink?: boolean
+}> = [
   { label: 'Food 🔥', bg: '#FF8A4C', rot: -8, x: '6%', y: '16%' },
   { label: 'Pharmacy 💊', bg: '#5EC4C0', rot: 6, x: '70%', y: '20%' },
   { label: 'Track live 📍', bg: '#EFC27A', rot: -4, x: '74%', y: '56%', ink: true },
   { label: 'Kampe ✓', bg: '#FFFFFF', rot: 10, x: '10%', y: '58%', ink: true },
   { label: 'Badagry only', bg: '#2A5C38', rot: -12, x: '55%', y: '76%' },
-] as const
+]
 
 /** Gen Z / inDrive-adjacent hero — comic type energy, cartoon motion, KampeDrop colors. */
 export function CartoonHero() {

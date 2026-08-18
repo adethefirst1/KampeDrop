@@ -2,13 +2,14 @@ import { Link } from 'react-router-dom'
 import { appPath } from '../paths'
 import { motion, useReducedMotion } from 'motion/react'
 import { MarketingLayout, GuaranteePill } from '../components/layout'
+import { AppEntryButton } from '../components/InstallPrompt'
 import { MotionItem, Reveal, SecureSeal, Stagger } from '../components/motion'
 import { CartoonHero } from '../components/CartoonHero'
 import { CategoryMorphCarousel } from '../components/CategoryMorphCarousel'
 import { IMAGES, SITE } from '../data/site'
 import { categoryLabel } from '../data/vendors'
 import { useCatalog } from '../context/CatalogContext'
-import { easeOut, fadeUp, hoverLift, springSoft, tapPress } from '../motion/tokens'
+import { easeOut, fadeUp, springSoft, tapPress } from '../motion/tokens'
 
 const MotionLink = motion.create(Link)
 

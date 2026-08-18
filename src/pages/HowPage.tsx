@@ -7,7 +7,7 @@ const steps = [
   {
     n: '01',
     title: 'Order from home',
-    body: 'Open SureDrop in your browser. Pick a vetted vendor in Badagry — food, mart essentials, or pharmacy. No app download.',
+    body: 'Open KampeDrop in your browser. Pick a vetted vendor in Badagry — food, mart essentials, or pharmacy. No app download.',
     image: IMAGES.kitchen,
   },
   {
@@ -25,7 +25,7 @@ const steps = [
   {
     n: '04',
     title: 'Secured — or made right',
-    body: 'If it’s wrong or late, we fix it. That’s the SureDrop Guarantee, built into every order.',
+    body: 'If it’s wrong or late, we fix it. That’s the KampeDrop Guarantee, built into every order.',
     image: IMAGES.hero,
   },
 ]
@@ -79,7 +79,7 @@ export function HowPage() {
             Ready when you are.
           </h2>
           <p className="mx-auto mt-3 max-w-md text-muted">
-            Guest checkout. Cash on delivery available. Covered by the SureDrop Guarantee.
+            Guest checkout. Cash on delivery available. Covered by the KampeDrop Guarantee.
           </p>
           <Link to={appPath()} className="btn-primary mt-8">
             Order near me

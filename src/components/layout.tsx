@@ -236,7 +236,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-white/10">
         <div className="container-site flex flex-col gap-2 py-5 text-xs text-white/40 sm:flex-row sm:justify-between">
-          <p>© {new Date().getFullYear()} SureDrop. Born in Badagry, by the lagoon.</p>
+          <p>© {new Date().getFullYear()} KampeDrop. Born in Badagry, by the lagoon.</p>
           <p>Web app · Install to your home screen</p>
         </div>
       </div>
@@ -259,7 +259,7 @@ export function GuaranteePill({ compact = false }: { compact?: boolean }) {
           compact ? 'text-xs leading-snug' : 'text-sm leading-snug'
         }`}
       >
-        <span className="font-bold">SureDrop Guarantee</span>
+        <span className="font-bold">KampeDrop Guarantee</span>
         {compact
           ? ' — wrong or late, we fix it.'
           : ' — if it’s wrong or late, we make it right. Immediately.'}

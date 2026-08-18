@@ -55,7 +55,7 @@ export function TransferPayPanel({ order, onClaimPaid }: Props) {
       <p className="mt-2 text-sm text-muted">
         Send exactly{' '}
         <span className="font-bold text-ink">{formatNaira(order.total)}</span> to
-        SureDrop escrow. Use order ID as narration.
+        KampeDrop escrow. Use order ID as narration.
       </p>
 
       <div className="mt-4 space-y-2 rounded-2xl bg-mist p-3">

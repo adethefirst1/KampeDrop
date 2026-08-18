@@ -1,4 +1,4 @@
-/** Minimal Google Maps Places typings used by SureDrop (avoids hard dep if types lag). */
+/** Minimal Google Maps Places typings used by KampeDrop (avoids hard dep if types lag). */
 declare namespace google.maps {
   class LatLng {
     constructor(lat: number, lng: number)

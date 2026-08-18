@@ -73,7 +73,7 @@ export function TrackPage() {
         setCloudOrder(result.order)
         try {
           sessionStorage.setItem(
-            `suredrop-order-${orderId}`,
+            `kampedrop-order-${orderId}`,
             JSON.stringify(result.order),
           )
         } catch {
@@ -168,11 +168,11 @@ export function TrackPage() {
   useEffect(() => {
     if (!orderId || !opsOrder) return
     try {
-      const raw = sessionStorage.getItem(`suredrop-order-${orderId}`)
+      const raw = sessionStorage.getItem(`kampedrop-order-${orderId}`)
       if (!raw) {
         if (baseOrder) {
           sessionStorage.setItem(
-            `suredrop-order-${orderId}`,
+            `kampedrop-order-${orderId}`,
             JSON.stringify(baseOrder),
           )
         }
@@ -181,7 +181,7 @@ export function TrackPage() {
       const buyer = JSON.parse(raw) as PlacedOrder
       const nextStatus = furtherStatus(buyer.status, opsOrder.status)
       sessionStorage.setItem(
-        `suredrop-order-${orderId}`,
+        `kampedrop-order-${orderId}`,
         JSON.stringify({
           ...buyer,
           ...opsOrder,
@@ -240,7 +240,7 @@ export function TrackPage() {
           </h1>
           <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted">
             This link may be from another phone or browser. Place a new order, or
-            call SureDrop with your order ID.
+            call KampeDrop with your order ID.
           </p>
           <Link to={appPath()} className="btn-primary mt-8 inline-flex">
             Browse vendors

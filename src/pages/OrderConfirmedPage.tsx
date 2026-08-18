@@ -7,6 +7,7 @@ import { SecureSeal } from '../components/motion'
 import { loadOrder, useCart, type PlacedOrder } from '../context/CartContext'
 import { useCatalog } from '../context/CatalogContext'
 import { formatNaira, type Category } from '../data/vendors'
+import { SITE } from '../data/site'
 import { easeOut, springSnap } from '../motion/tokens'
 
 type ConfirmTone = {
@@ -159,7 +160,7 @@ export function OrderConfirmedPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: easeOut }}
           >
-            SureDrop · {tone.eyebrow}
+            {SITE.name} · {tone.eyebrow}
           </motion.p>
 
           <div className="mt-6 flex items-start gap-4">
@@ -218,7 +219,7 @@ export function OrderConfirmedPage() {
               {tone.cta}
             </Link>
             <p className={`text-xs leading-snug sm:max-w-[22ch] ${tone.muted}`}>
-              Wrong or late — SureDrop makes it right.
+              Wrong or late — KampeDrop makes it right.
             </p>
           </motion.div>
         </div>

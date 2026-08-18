@@ -15,7 +15,7 @@ import {
   type Vendor,
 } from '../data/vendors'
 
-export const CATALOG_STORAGE_KEY = 'suredrop-catalog'
+export const CATALOG_STORAGE_KEY = 'kampedrop-catalog'
 
 type CatalogContextValue = {
   vendors: Vendor[]

@@ -1,4 +1,4 @@
-# SureDrop
+# KampeDrop
 
 Trust-first hyperlocal delivery for Badagry–Ojo, Lagos.
 

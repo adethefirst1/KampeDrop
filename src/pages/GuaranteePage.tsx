@@ -9,7 +9,7 @@ export function GuaranteePage() {
       <section className="bg-lagoon-deep py-16 text-white md:py-24">
         <div className="container-site">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/55">
-            SureDrop Guarantee
+            KampeDrop Guarantee
           </p>
           <h1 className="mt-4 max-w-[16ch] font-display text-4xl font-semibold tracking-[-0.03em] md:text-6xl">
             Wrong or late — we make it right.
@@ -67,8 +67,8 @@ export function GuaranteePage() {
             </li>
           </ul>
           <p className="mt-10 text-sm text-muted">
-            Pilot note: during our {SITE.area} launch, every order placed on SureDrop is covered.
-            Arrangements made outside SureDrop are not.
+            Pilot note: during our {SITE.area} launch, every order placed on KampeDrop is covered.
+            Arrangements made outside KampeDrop are not.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link to={appPath()} className="btn-ink">

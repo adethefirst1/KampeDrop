@@ -208,7 +208,7 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setOrders([])
     try {
-      sessionStorage.removeItem('suredrop-ops-auth')
+      sessionStorage.removeItem('kampedrop-ops-auth')
     } catch {
       /* ignore */
     }
@@ -487,8 +487,8 @@ export function OpsProvider({ children }: { children: ReactNode }) {
             ok: false,
             reason:
               o.fulfillment === 'pickup'
-                ? 'Cannot cancel after the kitchen starts. Use the SureDrop Guarantee if something is wrong.'
-                : 'Cannot cancel after a rider accepts. Use the SureDrop Guarantee if something is wrong.',
+                ? 'Cannot cancel after the kitchen starts. Use the KampeDrop Guarantee if something is wrong.'
+                : 'Cannot cancel after a rider accepts. Use the KampeDrop Guarantee if something is wrong.',
           }
           return o
         }

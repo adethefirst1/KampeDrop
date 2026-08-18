@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Fraunces", Georgia, serif;
-  --font-sans: "Manrope", system-ui, sans-serif;
+  /* Gen Z / inDrive energy — rounded comic display + friendly body */
+  --font-display: "Fredoka", "Nunito", system-ui, sans-serif;
+  --font-sans: "Nunito", system-ui, sans-serif;
 
   /* Badagry dusk — lagoon deep, warm laterite, evening gold */
   --color-ink: #06181c;
@@ -83,41 +84,49 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 1rem;
+    border-radius: 999px;
     background: var(--color-mango);
     color: white;
-    font-weight: 700;
-    padding: 0.95rem 1.5rem;
+    font-weight: 800;
+    padding: 0.95rem 1.6rem;
     transition: background 160ms ease, transform 160ms ease;
+    box-shadow: 0 6px 0 color-mix(in oklab, var(--color-mango-deep) 85%, black);
   }
 
   .btn-primary:hover {
     background: var(--color-mango-deep);
+    transform: translateY(1px);
+    box-shadow: 0 5px 0 color-mix(in oklab, var(--color-mango-deep) 85%, black);
+  }
+
+  .btn-primary:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 color-mix(in oklab, var(--color-mango-deep) 85%, black);
   }
 
   .btn-secondary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 1rem;
-    border: 1px solid color-mix(in oklab, white 22%, transparent);
-    background: color-mix(in oklab, white 10%, transparent);
+    border-radius: 999px;
+    border: 2px solid color-mix(in oklab, white 35%, transparent);
+    background: color-mix(in oklab, white 12%, transparent);
     color: white;
-    font-weight: 600;
-    padding: 0.95rem 1.5rem;
+    font-weight: 800;
+    padding: 0.9rem 1.5rem;
     backdrop-filter: blur(8px);
-    transition: background 160ms ease;
+    transition: background 160ms ease, transform 160ms ease;
   }
 
   .btn-secondary:hover {
-    background: color-mix(in oklab, white 16%, transparent);
+    background: color-mix(in oklab, white 18%, transparent);
   }
 
   .btn-ink {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 1rem;
+    border-radius: 999px;
     background: var(--color-ink);
     color: white;
     font-weight: 700;

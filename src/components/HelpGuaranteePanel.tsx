@@ -33,7 +33,7 @@ export function HelpGuaranteePanel({
     status === 'delivered'
 
   const wa = whatsappHelpUrl(
-    `SureDrop help — order ${orderId}. Issue: ${issue}. Status: ${status}.`,
+    `KampeDrop help — order ${orderId}. Issue: ${issue}. Status: ${status}.`,
   )
 
   function submitReport() {
@@ -50,7 +50,7 @@ export function HelpGuaranteePanel({
       </p>
       <p className="mt-2 text-sm text-muted">
         {afterVendorHandoff
-          ? 'Vendor handoff is done (passkey). Door delivery issues still get the SureDrop Guarantee — we’ll make it right.'
+          ? 'Vendor handoff is done (passkey). Door delivery issues still get the KampeDrop Guarantee — we’ll make it right.'
           : 'Talk to a human, or report an issue on this order.'}
       </p>
 
@@ -65,7 +65,7 @@ export function HelpGuaranteePanel({
           href={`tel:${SITE.supportPhone}`}
           className="rounded-2xl bg-ink px-4 py-3 text-center text-sm font-bold text-white"
         >
-          Call SureDrop
+          Call KampeDrop
         </a>
         <a
           href={wa}

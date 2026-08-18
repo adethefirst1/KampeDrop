@@ -1,6 +1,8 @@
 export const SITE = {
-  name: 'SureDrop',
-  tagline: 'From a Badagry home to your door — secured.',
+  name: 'KampeDrop',
+  /** Yoruba/Naija: kampe ≈ sure / certain / solid */
+  nameMeaning: 'Kampe means sure',
+  tagline: 'From a Badagry home to your door — kampe.',
   supportLine: 'Confirmed. Tracked. Made right.',
   area: 'Badagry',
   areaLong: 'Badagry Town and along the Expressway',
@@ -10,6 +12,7 @@ export const SITE = {
   /** digits only for wa.me */
   supportWhatsApp: '2348076283611',
   supportWhatsAppDisplay: '0807 628 3611',
+  /** Still the live inbox until a KampeDrop address is ready */
   email: 'suredropltd@gmail.com',
   neighbourhoods: [
     'Badagry Town',
@@ -23,11 +26,11 @@ export const SITE = {
   ],
   /**
    * Escrow receiving account (Phase 1 manual transfer).
-   * Replace with real SureDrop account before pilot.
+   * Replace with real KampeDrop account before pilot.
    */
   transferAccount: {
     bankName: 'Providus Bank',
-    accountName: 'SureDrop Escrow',
+    accountName: 'KampeDrop Escrow',
     accountNumber: '0000000000',
     narrationHint: 'Use your order ID as narration',
   },
@@ -37,12 +40,15 @@ export function whatsappHelpUrl(message: string) {
   return `https://wa.me/${SITE.supportWhatsApp}?text=${encodeURIComponent(message)}`
 }
 
-/** Local brand photography — lagoon dusk, corridor, home kitchen */
+/** Local brand photography — lagoon dusk, corridor, home kitchen, people */
 export const IMAGES = {
   hero: '/brand/hero.jpg',
   corridor: '/brand/corridor.jpg',
   door: '/brand/kitchen.jpg',
   kitchen: '/brand/kitchen.jpg',
+  /** Warm everyday faces for landing trust sections */
+  truthPeople: '/brand/truth-people.jpg',
+  feelPeople: '/brand/feel-people.jpg',
   mart:
     'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80',
   pharmacy:

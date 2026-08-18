@@ -85,7 +85,7 @@ export const seedVendors: Vendor[] = [
     name: 'Ajara Everyday Mart',
     category: 'mart',
     area: 'Ajara',
-    pickupSpot: 'Ajara Junction mart — ask for SureDrop counter',
+    pickupSpot: 'Ajara Junction mart — ask for KampeDrop counter',
     tagline: 'Rice, oil, eggs, detergent — the things Badagry homes actually run out of.',
     etaMins: 35,
     rating: 4.8,

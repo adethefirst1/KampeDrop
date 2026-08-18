@@ -63,7 +63,7 @@ export function AdminLoginPage() {
         transition={{ duration: 0.45, ease: easeOut }}
       >
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-lagoon">
-          SureDrop Ops
+          KampeDrop Ops
         </p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.03em]">
           Badagry control room

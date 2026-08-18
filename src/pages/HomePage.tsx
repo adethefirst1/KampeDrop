@@ -2,30 +2,31 @@ import { Link } from 'react-router-dom'
 import { appPath } from '../paths'
 import { motion, useReducedMotion } from 'motion/react'
 import { MarketingLayout, GuaranteePill } from '../components/layout'
-import { AppEntryButton, InstallPrompt } from '../components/InstallPrompt'
 import { MotionItem, Reveal, SecureSeal, Stagger } from '../components/motion'
+import { CartoonHero } from '../components/CartoonHero'
+import { CategoryMorphCarousel } from '../components/CategoryMorphCarousel'
 import { IMAGES, SITE } from '../data/site'
 import { categoryLabel } from '../data/vendors'
 import { useCatalog } from '../context/CatalogContext'
-import { easeOut, fadeUp, heroWord, hoverLift, springSoft, tapPress } from '../motion/tokens'
+import { easeOut, fadeUp, hoverLift, springSoft, tapPress } from '../motion/tokens'
 
 const MotionLink = motion.create(Link)
 
 function NeighbourhoodMarquee() {
   const places = [...SITE.neighbourhoods, ...SITE.neighbourhoods]
   return (
-    <div className="overflow-hidden border-y border-line bg-paper py-5">
-      <p className="mb-3 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-lagoon">
-        We know these roads
+    <div className="overflow-hidden border-y-4 border-ink bg-dusk py-5">
+      <p className="mb-3 text-center text-[11px] font-extrabold uppercase tracking-[0.18em] text-ink">
+        We know these roads 🛵
       </p>
       <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-paper to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-paper to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-dusk to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-dusk to-transparent" />
         <div className="flex w-max marquee gap-3 pr-3">
           {places.map((place, i) => (
             <span
               key={`${place}-${i}`}
-              className="shrink-0 rounded-full border border-line bg-mist px-4 py-2 text-sm font-semibold text-ink-soft"
+              className="shrink-0 rounded-full border-2 border-ink bg-paper px-4 py-2 text-sm font-extrabold text-ink"
             >
               {place}
             </span>
@@ -42,113 +43,38 @@ export function HomePage() {
 
   return (
     <MarketingLayout transparentHeader showInstall>
-      {/* Hero — brand first, Badagry dusk */}
-      <section className="relative min-h-[100svh] overflow-hidden bg-ink text-white">
-        <div className="absolute inset-0">
-          <img
-            src={IMAGES.hero}
-            alt="Badagry lagoon at dusk"
-            className={`h-full w-full object-cover opacity-60 ${reduce ? '' : 'ken-burns'}`}
-          />
-          <div className="absolute inset-0 lagoon-shine" />
-          <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/75 to-ink/30" />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink via-transparent to-ink/50" />
-        </div>
-
-        {!reduce && (
-          <>
-            <motion.div
-              className="pointer-events-none absolute -right-8 top-24 h-72 w-72 rounded-full bg-dusk/20 blur-3xl"
-              animate={{ x: [0, -18, 0], y: [0, 14, 0] }}
-              transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
-            />
-            <motion.div
-              className="pointer-events-none absolute -left-20 bottom-16 h-80 w-80 rounded-full bg-lagoon/30 blur-3xl"
-              animate={{ x: [0, 16, 0], y: [0, -12, 0] }}
-              transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          </>
-        )}
-
-        <div className="container-site relative z-10 flex min-h-[100svh] flex-col justify-end pb-16 pt-28 md:justify-center md:pb-28 md:pt-24">
-          <motion.p
-            className="text-xs font-semibold uppercase tracking-[0.24em] text-dusk"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, ease: easeOut }}
-          >
-            Badagry · by the lagoon
-          </motion.p>
-
-          <motion.h1
-            className="mt-4 max-w-[9ch] font-display text-[3.6rem] font-semibold leading-[0.95] tracking-[-0.045em] sm:text-[4.75rem] md:text-[5.75rem]"
-            variants={heroWord}
-            initial="hidden"
-            animate="show"
-          >
-            SureDrop
-          </motion.h1>
-
-          <motion.span
-            className="mt-5 block h-[3px] w-20 origin-left rounded-full bg-gradient-to-r from-mango to-dusk"
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ delay: 0.5, duration: 0.75, ease: easeOut }}
-          />
-
-          <motion.p
-            className="mt-5 max-w-[18ch] font-display text-[1.55rem] font-medium leading-[1.2] tracking-[-0.02em] text-white sm:text-[1.85rem]"
-            initial={{ opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.32, duration: 0.7, ease: easeOut }}
-          >
-            {SITE.tagline}
-          </motion.p>
-
-          <motion.p
-            className="mt-3 max-w-md text-[0.95rem] leading-relaxed text-white/60"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.55, duration: 0.6 }}
-          >
-            {SITE.supportLine} Built for homes that the big apps forgot.
-          </motion.p>
-
-          <motion.div
-            className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center"
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.55, ease: easeOut }}
-          >
-            <AppEntryButton className="btn-primary shadow-[0_14px_40px_rgba(217,119,47,0.38)]">
-              Order in Badagry
-            </AppEntryButton>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <InstallPrompt compact />
-              <MotionLink to="/how" className="btn-secondary" whileHover={hoverLift} whileTap={tapPress}>
-                How it works
-              </MotionLink>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+      <CartoonHero />
 
       <NeighbourhoodMarquee />
 
-      {/* Emotion: the gap */}
-      <section className="bg-paper py-20 md:py-28">
-        <div className="container-site grid items-center gap-10 md:grid-cols-2 md:gap-16">
+      <CategoryMorphCarousel />
+
+      {/* Badagry truth — soft, human, it’s finally here */}
+      <section className="relative overflow-hidden py-20 md:py-28">
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#f7f1e8] via-paper to-mist"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-dusk/25 blur-3xl"
+          aria-hidden
+        />
+        <div className="container-site relative grid items-center gap-10 md:grid-cols-2 md:gap-16">
           <Reveal>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-lagoon">
               The Badagry truth
             </p>
-            <h2 className="mt-3 max-w-[15ch] font-display text-3xl font-semibold tracking-[-0.03em] md:text-[2.75rem] md:leading-[1.1]">
-              Waiting on a rider who never confirms shouldn’t be normal.
+            <h2 className="mt-3 max-w-[16ch] font-display text-3xl font-semibold tracking-[-0.03em] text-ink md:text-[2.75rem] md:leading-[1.1]">
+              You’re not thinking it again. It’s happening.
             </h2>
             <p className="mt-5 max-w-md text-base leading-relaxed text-muted">
-              Between the lagoon and the Expressway, ordering from home often means informal chats
-              and hope. SureDrop exists so Ajara, Ibereko, Aradagun, and Town get the same certainty
-              Mainland apps promise elsewhere.
+              For a long time, homes here watched the rest of Lagos order with a tap — while we
+              mostly made do with chats and hope. KampeDrop is for Badagry nights: food, mart, or
+              pharmacy from people you can trust, tracked to your gate, payment held until handoff.
+              Breathe. It’s live on these roads.
+            </p>
+            <p className="mt-4 max-w-md text-sm font-semibold text-lagoon-deep">
+              Town · Ajara · Ibereko · Aradagun — same calm you deserve.
             </p>
           </Reveal>
           <Reveal
@@ -162,56 +88,73 @@ export function HomePage() {
               },
             }}
           >
-            <div className="relative overflow-hidden rounded-[2rem]">
+            <div className="relative overflow-hidden rounded-[2rem] shadow-[0_24px_60px_rgba(6,24,28,0.12)]">
               <motion.img
-                src={IMAGES.corridor}
-                alt="Palm corridor along Badagry roads"
-                className="aspect-[4/3] w-full object-cover"
+                src={IMAGES.truthPeople}
+                alt="A Badagry neighbour smiling — ordering from home finally feels possible"
+                className="aspect-[4/5] w-full object-cover object-top md:aspect-[4/3]"
                 whileHover={reduce ? undefined : { scale: 1.03 }}
                 transition={{ duration: 0.8, ease: easeOut }}
               />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent p-5">
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/55 via-ink/15 to-transparent p-5 pt-16">
                 <p className="font-display text-lg font-semibold text-white">
-                  The corridor we actually live on
+                  For homes like yours
                 </p>
+                <p className="mt-1 text-sm text-white/80">Real people. Real roads. Real orders.</p>
               </div>
             </div>
           </Reveal>
         </div>
       </section>
 
-      {/* Emotion: relief */}
-      <section className="relative overflow-hidden bg-ink py-20 text-white md:py-28">
-        <div className="pointer-events-none absolute -right-24 top-0 h-72 w-72 rounded-full bg-lagoon/25 blur-3xl" />
+      {/* The feeling — warm comfort, does shopping feel like shopping? */}
+      <section className="relative overflow-hidden py-20 md:py-28">
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-bl from-[#e8f2ef] via-[#f3f8f6] to-[#efe6d8]"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-lagoon/15 blur-3xl"
+          aria-hidden
+        />
         <div className="container-site relative grid items-center gap-10 md:grid-cols-2 md:gap-16">
           <Reveal className="order-2 md:order-1">
-            <div className="overflow-hidden rounded-[2rem]">
+            <div className="relative overflow-hidden rounded-[2rem] shadow-[0_24px_60px_rgba(6,24,28,0.12)]">
               <motion.img
-                src={IMAGES.kitchen}
-                alt="Home food ready for delivery"
-                className="aspect-[4/3] w-full object-cover"
+                src={IMAGES.feelPeople}
+                alt="Evening ease — the quiet comfort of knowing your order is handled"
+                className="aspect-[4/5] w-full object-cover object-[center_20%] md:aspect-[4/3]"
                 whileHover={reduce ? undefined : { scale: 1.03 }}
                 transition={{ duration: 0.8, ease: easeOut }}
               />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/50 via-transparent to-transparent p-5 pt-20">
+                <p className="font-display text-lg font-semibold text-white">
+                  That evening ease
+                </p>
+              </div>
             </div>
           </Reveal>
           <Reveal className="order-1 md:order-2">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-dusk">The feeling</p>
-            <h2 className="mt-3 max-w-[14ch] font-display text-3xl font-semibold tracking-[-0.03em] md:text-[2.75rem] md:leading-[1.1]">
-              Evening calm. Food on the way. No guessing.
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-lagoon">
+              The feeling
+            </p>
+            <h2 className="mt-3 max-w-[15ch] font-display text-3xl font-semibold tracking-[-0.03em] text-ink md:text-[2.75rem] md:leading-[1.1]">
+              Don’t just say it’s shopping. Does it feel like shopping?
             </h2>
-            <p className="mt-5 max-w-md text-base leading-relaxed text-white/65">
-              That knock at your gate should feel expected — not like a surprise. Confirmed when you
-              order. Visible while it moves. Made right if anything slips.
+            <p className="mt-5 max-w-md text-base leading-relaxed text-muted">
+              Real shopping feels soft on the nerves: you see what you chose, you know it’s moving,
+              money isn’t a leap of faith, and someone owns the outcome. A chat that only takes your
+              order isn’t the same thing. When it’s KampeDrop, it should feel like sitting back —
+              food, soap, or medicine on the way, without the guesswork.
             </p>
             <div className="mt-6">
               <GuaranteePill />
             </div>
             <MotionLink
               to="/guarantee"
-              className="mt-6 inline-flex text-sm font-bold text-dusk hover:underline"
+              className="mt-6 inline-flex text-sm font-bold text-lagoon hover:underline"
             >
-              Read the SureDrop Guarantee →
+              Read the KampeDrop Guarantee →
             </MotionLink>
           </Reveal>
         </div>

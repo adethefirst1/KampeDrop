@@ -52,7 +52,7 @@ export function CartPage() {
                 {lastDone ? 'Your last order' : 'Order in progress'}
               </p>
               <p className="mt-2 font-display text-xl font-semibold tracking-[-0.02em] text-ink">
-                {lastVendor?.name ?? 'SureDrop order'}
+                {lastVendor?.name ?? 'KampeDrop order'}
               </p>
               <p className="mt-1 text-sm leading-snug text-muted">
                 {firstName ? `For ${firstName} · ` : ''}

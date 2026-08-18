@@ -26,7 +26,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-40 border-b border-line/70 bg-paper/95 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-3 px-4">
           <Link to="/admin" className="font-display text-lg font-semibold tracking-[-0.02em]">
-            SureDrop <span className="text-lagoon">Ops</span>
+            KampeDrop <span className="text-lagoon">Ops</span>
           </Link>
           <nav className="flex items-center gap-1 text-xs font-bold">
             <Link

@@ -277,7 +277,7 @@ export function CheckoutPage() {
           </div>
           {payment === 'transfer' && (
             <p className="mt-2 text-xs leading-relaxed text-muted">
-              You’ll get bank details on the next screen. Transfer to SureDrop
+              You’ll get bank details on the next screen. Transfer to KampeDrop
               escrow — vendor is paid only after{' '}
               {pickup
                 ? 'you collect with your passkey'

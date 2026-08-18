@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
       manifest: {
-        name: 'SureDrop',
-        short_name: 'SureDrop',
+        name: 'KampeDrop',
+        short_name: 'KampeDrop',
         description:
           'From a Badagry home to your door — secured. Trust-first delivery for Badagry.',
         theme_color: '#071f24',

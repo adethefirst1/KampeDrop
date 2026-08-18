@@ -27,30 +27,30 @@ function isIosSafari() {
 
 const steps: Record<Platform, { title: string; items: string[] }> = {
   ios: {
-    title: 'Add SureDrop to your iPhone',
+    title: 'Add KampeDrop to your iPhone',
     items: [
       'Open this site in Safari (not Chrome or Instagram browser).',
       'Tap the Share button at the bottom of Safari.',
       'Scroll and tap Add to Home Screen.',
-      'Tap Add. SureDrop appears as an icon — tap it anytime to order.',
+      'Tap Add. KampeDrop appears as an icon — tap it anytime to order.',
     ],
   },
   android: {
-    title: 'Install SureDrop on Android',
+    title: 'Install KampeDrop on Android',
     items: [
       'Tap Install below (or use the Chrome menu ⋮).',
       'Confirm Install app when Chrome asks.',
-      'Find the SureDrop icon on your home screen.',
+      'Find the KampeDrop icon on your home screen.',
       'Open it anytime — it launches straight into ordering.',
     ],
   },
   desktop: {
-    title: 'Install SureDrop on this device',
+    title: 'Install KampeDrop on this device',
     items: [
       'In Chrome or Edge, look for the install icon in the address bar.',
       'Or tap Install below if your browser offers it.',
-      'SureDrop opens in its own window, like a normal app.',
-      'On your phone, visit suredrop and use Add to Home Screen for the best experience.',
+      'KampeDrop opens in its own window, like a normal app.',
+      'On your phone, visit kampedrop and use Add to Home Screen for the best experience.',
     ],
   },
 }
@@ -119,7 +119,7 @@ export function InstallPrompt({ compact = false }: { compact?: boolean }) {
 
   useEffect(() => {
     try {
-      setDismissed(sessionStorage.getItem('suredrop-install-dismissed') === '1')
+      setDismissed(sessionStorage.getItem('kampedrop-install-dismissed') === '1')
     } catch {
       /* ignore */
     }
@@ -131,7 +131,7 @@ export function InstallPrompt({ compact = false }: { compact?: boolean }) {
     setDismissed(true)
     setOpen(false)
     try {
-      sessionStorage.setItem('suredrop-install-dismissed', '1')
+      sessionStorage.setItem('kampedrop-install-dismissed', '1')
     } catch {
       /* ignore */
     }
@@ -169,7 +169,7 @@ export function InstallPrompt({ compact = false }: { compact?: boolean }) {
           <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-white/10 bg-ink px-4 py-3.5 text-white shadow-[0_12px_40px_rgba(14,28,24,0.4)]">
             <img src="/icons/icon-192.png" alt="" className="h-11 w-11 rounded-xl" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold">Put SureDrop on your home screen</p>
+              <p className="text-sm font-bold">Put KampeDrop on your home screen</p>
               <p className="text-xs text-white/60">We’ll show you the exact steps for your phone.</p>
             </div>
             <button
@@ -258,7 +258,7 @@ export function AppGuideSheet({
               <img src="/icons/icon-192.png" alt="" className="h-12 w-12 rounded-2xl" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-lagoon">
-                  SureDrop app
+                  KampeDrop app
                 </p>
                 <h2
                   id="app-guide-title"
@@ -280,7 +280,7 @@ export function AppGuideSheet({
             {view === 'choose' ? (
               <div className="mt-5 space-y-3">
                 <p className="text-sm leading-relaxed text-muted">
-                  You can order in your browser right now, or install SureDrop so it sits on your
+                  You can order in your browser right now, or install KampeDrop so it sits on your
                   home screen like a normal app.
                 </p>
 
@@ -315,7 +315,7 @@ export function AppGuideSheet({
             ) : (
               <div className="mt-5 space-y-4">
                 <p className="text-sm leading-relaxed text-muted">
-                  Follow these steps on your device. When you’re done, open the SureDrop icon —
+                  Follow these steps on your device. When you’re done, open the KampeDrop icon —
                   it goes straight to ordering.
                 </p>
 
@@ -401,7 +401,7 @@ export function InAppInstallTip() {
       return
     }
     try {
-      setHidden(sessionStorage.getItem('suredrop-app-tip-hidden') === '1')
+      setHidden(sessionStorage.getItem('kampedrop-app-tip-hidden') === '1')
     } catch {
       setHidden(false)
     }
@@ -412,7 +412,7 @@ export function InAppInstallTip() {
   return (
     <>
       <div className="mb-4 rounded-2xl border border-lagoon/20 bg-lagoon/8 px-4 py-3">
-        <p className="text-sm font-semibold text-lagoon-deep">Using SureDrop in your browser</p>
+        <p className="text-sm font-semibold text-lagoon-deep">Using KampeDrop in your browser</p>
         <p className="mt-1 text-xs leading-relaxed text-ink-soft">
           Want the home-screen icon? We’ll walk you through install in a few taps.
         </p>
@@ -429,7 +429,7 @@ export function InAppInstallTip() {
             onClick={() => {
               setHidden(true)
               try {
-                sessionStorage.setItem('suredrop-app-tip-hidden', '1')
+                sessionStorage.setItem('kampedrop-app-tip-hidden', '1')
               } catch {
                 /* ignore */
               }

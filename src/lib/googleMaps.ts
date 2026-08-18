@@ -3,7 +3,7 @@ import { BADAGRY_CENTER, BADAGRY_RADIUS_M, type DeliveryPlace } from '../data/pl
 declare global {
   interface Window {
     google?: typeof google
-    __suredropMapsPromise?: Promise<typeof google>
+    __kampedropMapsPromise?: Promise<typeof google>
   }
 }
 
@@ -25,11 +25,11 @@ export function loadGoogleMaps(): Promise<typeof google | null> {
     return Promise.resolve(window.google)
   }
 
-  if (window.__suredropMapsPromise) {
-    return window.__suredropMapsPromise.then(() => window.google ?? null)
+  if (window.__kampedropMapsPromise) {
+    return window.__kampedropMapsPromise.then(() => window.google ?? null)
   }
 
-  window.__suredropMapsPromise = new Promise((resolve, reject) => {
+  window.__kampedropMapsPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script')
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&v=weekly`
     script.async = true
@@ -41,7 +41,7 @@ export function loadGoogleMaps(): Promise<typeof google | null> {
     document.head.appendChild(script)
   })
 
-  return window.__suredropMapsPromise
+  return window.__kampedropMapsPromise
     .then(() => window.google ?? null)
     .catch(() => null)
 }

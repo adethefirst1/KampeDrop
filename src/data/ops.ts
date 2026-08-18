@@ -40,8 +40,8 @@ export type OpsOrder = PlacedOrder & {
   hasProblem: boolean
 }
 
-export const OPS_STORAGE_KEY = 'suredrop-ops-orders-v2'
-export const OPS_AUTH_KEY = 'suredrop-ops-auth'
+export const OPS_STORAGE_KEY = 'kampedrop-ops-orders-v2'
+export const OPS_AUTH_KEY = 'kampedrop-ops-auth'
 
 /** Delivery pipeline (cancel is terminal, not a step). */
 export const deliveryPipeline: OrderStatus[] = [
@@ -554,7 +554,7 @@ export function placedToOps(order: PlacedOrder): OpsOrder {
 
 export function syncBuyerOrder(order: Pick<PlacedOrder, 'id'> & Partial<PlacedOrder>) {
   try {
-    const key = `suredrop-order-${order.id}`
+    const key = `kampedrop-order-${order.id}`
     const raw = sessionStorage.getItem(key)
     const prev = raw ? (JSON.parse(raw) as PlacedOrder) : null
     const next = { ...(prev ?? {}), ...order } as PlacedOrder

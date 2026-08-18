@@ -27,13 +27,13 @@ export function TermsPage() {
         <div className="container-narrow space-y-12 text-base leading-relaxed text-muted">
           <Section title="1. Who we are">
             <p>
-              SureDrop is a hyperlocal delivery and pickup service currently operating in the
+              KampeDrop is a hyperlocal delivery and pickup service currently operating in the
               Badagry–Ojo corridor, Lagos State, Nigeria. This page explains what our guarantee
               covers, how payments and cancellations work, and what happens if something goes
               wrong.
             </p>
             <p className="mt-4">
-              By placing an order or registering with SureDrop, you agree to the terms below.
+              By placing an order or registering with KampeDrop, you agree to the terms below.
             </p>
           </Section>
 
@@ -58,18 +58,18 @@ export function TermsPage() {
               <li>
                 <span className="font-semibold text-ink">Bank transfer — </span>
                 pay in advance via transfer. Funds are held until your order is confirmed as
-                handed over (see Escrow &amp; the SureDrop Guarantee). Ops confirms receipt of
+                handed over (see Escrow &amp; the KampeDrop Guarantee). Ops confirms receipt of
                 transfer before your order proceeds with confidence.
               </li>
             </ul>
             <p className="mt-4">We do not currently store or process card payments directly.</p>
           </Section>
 
-          <Section title="4. Escrow &amp; the SureDrop Guarantee">
+          <Section title="4. Escrow &amp; the KampeDrop Guarantee">
             <p>
               For orders paid by transfer, your payment is{' '}
               <span className="font-semibold text-ink">held</span>, not released to the
-              vendor, until SureDrop confirms the order left the vendor correctly — either
+              vendor, until KampeDrop confirms the order left the vendor correctly — either
               with a vetted rider, or collected by you on pickup.
             </p>
             <p className="mt-4">
@@ -81,13 +81,13 @@ export function TermsPage() {
             </p>
             <p className="mt-4">
               Door delivery after that handoff is still tracked. Problems on the way to you
-              (late, wrong, missing) are covered by the SureDrop Guarantee via report /
+              (late, wrong, missing) are covered by the KampeDrop Guarantee via report /
               support — but escrow release is tied to the{' '}
               <span className="font-semibold text-ink">vendor handoff</span>, not arrival at
               your door.
             </p>
             <p className="mt-4">
-              <span className="font-semibold text-ink">This is the core of the SureDrop Guarantee:</span>{' '}
+              <span className="font-semibold text-ink">This is the core of the KampeDrop Guarantee:</span>{' '}
               if the vendor fill or handoff goes wrong before passkey confirmation, payment
               has not been released. Contact support and we will make it right — replacement,
               refund, or another fair resolution. After passkey, we still make late or wrong
@@ -132,20 +132,20 @@ export function TermsPage() {
               Every order has a “report a problem” option once you’ve passed the point where
               quick cancellation ends. Use this if your order is late, wrong, damaged, or
               anything else feels off. Our team reviews every report and will work with you
-              toward a fair resolution under the SureDrop Guarantee.
+              toward a fair resolution under the KampeDrop Guarantee.
             </p>
           </Section>
 
           <Section title="7. Personal Shoppers">
             <p>
-              SureDrop’s Personal Shopper service (when available) lets a verified SureDrop
+              KampeDrop’s Personal Shopper service (when available) lets a verified KampeDrop
               shopper purchase items on your behalf from local markets or shops.
             </p>
             <ul className="mt-4 list-disc space-y-2 pl-5">
               <li>
                 <span className="font-semibold text-ink">Registration is required on both sides. </span>
-                Personal shoppers are ID-verified and registered with SureDrop before they can
-                accept requests. Customers must also have a registered SureDrop account to
+                Personal shoppers are ID-verified and registered with KampeDrop before they can
+                accept requests. Customers must also have a registered KampeDrop account to
                 request a personal shopper.
               </li>
               <li>
@@ -154,12 +154,12 @@ export function TermsPage() {
               </li>
               <li>
                 <span className="font-semibold text-ink">The guarantee applies only within the app. </span>
-                If you request and pay for a personal shopper through SureDrop, you are covered
-                by the SureDrop Guarantee described above.{' '}
+                If you request and pay for a personal shopper through KampeDrop, you are covered
+                by the KampeDrop Guarantee described above.{' '}
                 <span className="font-semibold text-ink">
-                  Any arrangement made outside the SureDrop app or platform — including direct
+                  Any arrangement made outside the KampeDrop app or platform — including direct
                   off-app agreements with a shopper, rider, or vendor — is not covered by
-                  SureDrop, and we are not liable for any loss, damage, or dispute arising from
+                  KampeDrop, and we are not liable for any loss, damage, or dispute arising from
                   it.
                 </span>
               </li>
@@ -168,7 +168,7 @@ export function TermsPage() {
 
           <Section title="8. Vendors and riders">
             <p>
-              Vendors and riders on SureDrop go through a vetting process before joining the
+              Vendors and riders on KampeDrop go through a vetting process before joining the
               platform, including identity verification. We hold vendors and riders accountable
               to standards of reliability and conduct, and may remove any partner who does not
               meet them.
@@ -177,16 +177,16 @@ export function TermsPage() {
 
           <Section title="9. Limitation of liability">
             <p>
-              SureDrop makes reasonable efforts to ensure reliable service through vetted
+              KampeDrop makes reasonable efforts to ensure reliable service through vetted
               partners, escrow protection, and the passkey handoff system described above.
-              However, to the fullest extent permitted by law, SureDrop’s liability for any
+              However, to the fullest extent permitted by law, KampeDrop’s liability for any
               single order is limited to the value of that order (items, delivery fee, and any
               applicable service fee paid).
             </p>
             <p className="mt-4">
-              SureDrop is not liable for delays or failures caused by circumstances outside our
+              KampeDrop is not liable for delays or failures caused by circumstances outside our
               reasonable control, including but not limited to severe weather, road closures, or
-              actions taken outside the SureDrop platform as described in Section 7.
+              actions taken outside the KampeDrop platform as described in Section 7.
             </p>
             <p className="mt-4 text-sm italic text-muted">
               This section in particular should be finalized with a lawyer — liability caps and
@@ -196,8 +196,8 @@ export function TermsPage() {
 
           <Section title="10. Changes to these terms">
             <p>
-              We may update these terms from time to time as SureDrop’s services grow. Continued
-              use of SureDrop after changes take effect means you accept the updated terms.
+              We may update these terms from time to time as KampeDrop’s services grow. Continued
+              use of KampeDrop after changes take effect means you accept the updated terms.
               Material changes will be noted with an updated “last updated” date above.
             </p>
           </Section>
@@ -214,7 +214,7 @@ export function TermsPage() {
               <li>
                 <span className="font-semibold text-ink">WhatsApp: </span>
                 <a
-                  href={whatsappHelpUrl('Hello SureDrop — I have a question about an order.')}
+                  href={whatsappHelpUrl('Hello KampeDrop — I have a question about an order.')}
                   className="text-lagoon hover:underline"
                   target="_blank"
                   rel="noreferrer"

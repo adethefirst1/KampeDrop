@@ -75,7 +75,7 @@ export function BrowsePage() {
           </p>
           <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted">
             {activeVendors.length === 0
-              ? 'We’re onboarding vetted shops in Badagry. Check back shortly, or message SureDrop.'
+              ? 'We’re onboarding vetted shops in Badagry. Check back shortly, or message KampeDrop.'
               : 'Try another filter — food, mart, and pharmacy rotate by time of day.'}
           </p>
           {filter !== 'all' && activeVendors.length > 0 && (
@@ -128,7 +128,7 @@ export function BrowsePage() {
       <p className="mt-8 text-center text-xs text-muted">
         Covered by the{' '}
         <Link to="/guarantee" className="font-semibold text-lagoon">
-          SureDrop Guarantee
+          KampeDrop Guarantee
         </Link>
       </p>
     </AppShell>

@@ -25,7 +25,7 @@ export function VendorPage() {
             Vendor unavailable
           </h1>
           <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted">
-            This shop may be offline or no longer on SureDrop. Pick another nearby
+            This shop may be offline or no longer on KampeDrop. Pick another nearby
             vendor.
           </p>
           <Link to={appPath()} className="btn-primary mt-8 inline-flex">
@@ -168,7 +168,7 @@ export function VendorPage() {
             Menu coming soon
           </p>
           <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted">
-            This vendor is on SureDrop, but their list isn’t live yet. Try another
+            This vendor is on KampeDrop, but their list isn’t live yet. Try another
             shop nearby.
           </p>
           <Link to={appPath()} className="btn-ink mt-5 inline-flex">

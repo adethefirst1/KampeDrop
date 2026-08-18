@@ -173,7 +173,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const commitOrder = useCallback((order: PlacedOrder) => {
     try {
-      sessionStorage.setItem(`suredrop-order-${order.id}`, JSON.stringify(order))
+      sessionStorage.setItem(`kampedrop-order-${order.id}`, JSON.stringify(order))
     } catch {
       /* ignore */
     }
@@ -240,7 +240,7 @@ export function useCart() {
 
 export function loadOrder(id: string): PlacedOrder | null {
   try {
-    const raw = sessionStorage.getItem(`suredrop-order-${id}`)
+    const raw = sessionStorage.getItem(`kampedrop-order-${id}`)
     if (!raw) return null
     return JSON.parse(raw) as PlacedOrder
   } catch {

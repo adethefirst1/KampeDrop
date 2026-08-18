@@ -103,7 +103,7 @@ export function MotionItem({
   )
 }
 
-/** Animated “secured” seal — SureDrop’s signature confirm moment */
+/** Animated “secured” seal — KampeDrop’s signature confirm moment */
 export function SecureSeal({ className = '' }: { className?: string }) {
   const reduce = useReducedMotion()
 

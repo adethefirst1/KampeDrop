@@ -85,7 +85,9 @@ export function CheckoutPage() {
 
       commitOrder(order)
       ingestPlacedOrder(order)
-      ingestVendorOrder(order)
+      if (vendor?.id) {
+        ingestVendorOrder({ ...order, vendorId: vendor.id })
+      }
       setPlacedId(order.id)
     } catch {
       setSubmitError('Could not place your order right now. Please try again.')

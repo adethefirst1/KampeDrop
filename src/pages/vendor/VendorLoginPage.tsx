@@ -32,7 +32,7 @@ export function VendorLoginPage() {
       setError('No business found for that phone. Register first.')
       return
     }
-    const result = login(vendor.id, pin, vendor.accessPin)
+    const result = login(vendor.id, pin)
     if (!result.ok) setError(result.reason)
     else setError(null)
   }

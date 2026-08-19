@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import { CartProvider } from './context/CartContext'
 import { CatalogProvider } from './context/CatalogContext'
 import { OpsProvider } from './context/OpsContext'
+import { VendorProvider } from './context/VendorContext'
 import { HomePage } from './pages/HomePage'
 import { BrowsePage } from './pages/BrowsePage'
 import { VendorPage } from './pages/VendorPage'
@@ -20,6 +21,17 @@ import { TrackPage } from './pages/TrackPage'
 import { HowPage } from './pages/HowPage'
 import { GuaranteePage } from './pages/GuaranteePage'
 import { TermsPage } from './pages/TermsPage'
+import { WorkWithUsPage } from './pages/WorkWithUsPage'
+import {
+  RequireVendor,
+  VendorShell,
+} from './pages/vendor/VendorShell'
+import { VendorLoginPage } from './pages/vendor/VendorLoginPage'
+import { VendorSignupPage } from './pages/vendor/VendorSignupPage'
+import { VendorOrdersPage } from './pages/vendor/VendorOrdersPage'
+import { VendorOrderDetailPage } from './pages/vendor/VendorOrderDetailPage'
+import { VendorMenuPage } from './pages/vendor/VendorMenuPage'
+import { VendorProfilePage } from './pages/vendor/VendorProfilePage'
 import {
   AdminInboxPage,
   AdminLoginPage,
@@ -34,12 +46,14 @@ import { APP_BASE, appPath, isStandaloneDisplay } from './paths'
 function StandaloneGate({ children }: { children: ReactNode }) {
   const location = useLocation()
   if (location.pathname.startsWith('/admin')) return children
+  if (location.pathname.startsWith('/vendor')) return children
 
   const marketing =
     location.pathname === '/' ||
     location.pathname === '/how' ||
     location.pathname === '/guarantee' ||
-    location.pathname === '/terms'
+    location.pathname === '/terms' ||
+    location.pathname === '/work-with-us'
 
   if (isStandaloneDisplay() && marketing) {
     return <Navigate to={APP_BASE} replace />
@@ -56,6 +70,24 @@ function AppRoutes() {
         <Route path="/how" element={<HowPage />} />
         <Route path="/guarantee" element={<GuaranteePage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/work-with-us" element={<WorkWithUsPage />} />
+        <Route path="/partners" element={<Navigate to="/work-with-us" replace />} />
+
+        <Route path="/vendor/login" element={<VendorLoginPage />} />
+        <Route path="/vendor/signup" element={<VendorSignupPage />} />
+        <Route
+          path="/vendor"
+          element={
+            <RequireVendor>
+              <VendorShell />
+            </RequireVendor>
+          }
+        >
+          <Route index element={<VendorOrdersPage />} />
+          <Route path="orders/:orderId" element={<VendorOrderDetailPage />} />
+          <Route path="menu" element={<VendorMenuPage />} />
+          <Route path="profile" element={<VendorProfilePage />} />
+        </Route>
 
         <Route path={APP_BASE} element={<BrowsePage />} />
         <Route path={`${APP_BASE}/vendors/:vendorId`} element={<VendorPage />} />
@@ -100,9 +132,11 @@ export default function App() {
     <CatalogProvider>
       <CartProvider>
         <OpsProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
+          <VendorProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </VendorProvider>
         </OpsProvider>
       </CartProvider>
     </CatalogProvider>

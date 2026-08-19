@@ -43,7 +43,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 onVendors ? 'bg-ink text-white' : 'text-muted hover:text-ink'
               }`}
             >
-              Vendors
+              Businesses
             </Link>
           </nav>
           <div className="flex items-center gap-2">

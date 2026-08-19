@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useCart } from '../context/CartContext'
@@ -17,12 +18,15 @@ export function Logo({
   size?: 'md' | 'lg'
   to?: string
 }) {
-  const icon = size === 'lg' ? 'h-11 w-11' : 'h-9 w-9'
-  const text = size === 'lg' ? 'text-[1.6rem]' : 'text-[1.35rem]'
+  const icon = size === 'lg' ? 'h-11 w-11' : 'h-8 w-8 sm:h-9 sm:w-9'
+  const text =
+    size === 'lg'
+      ? 'text-[1.6rem]'
+      : 'text-[1.15rem] sm:text-[1.35rem]'
   return (
-    <Link to={to} className="inline-flex items-center gap-2.5">
+    <Link to={to} className="inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
       <span
-        className={`grid place-items-center rounded-xl ${icon} ${
+        className={`grid shrink-0 place-items-center rounded-xl ${icon} ${
           light ? 'bg-white/15 text-white' : 'bg-ink text-paper'
         }`}
         aria-hidden
@@ -41,7 +45,7 @@ export function Logo({
         </svg>
       </span>
       <span
-        className={`font-display font-semibold tracking-[-0.03em] ${text} ${
+        className={`truncate font-display font-semibold tracking-[-0.03em] ${text} ${
           light ? 'text-white' : 'text-ink'
         }`}
       >
@@ -52,28 +56,52 @@ export function Logo({
 }
 
 const marketingNav = [
-  { to: appPath(), label: 'Order' },
-  { to: '/how', label: 'How it works' },
-  { to: '/guarantee', label: 'Guarantee' },
-  { to: '/terms', label: 'Terms' },
+  { to: appPath(), label: 'Order', short: 'Order' },
+  { to: '/how', label: 'How it works', short: 'How' },
+  { to: '/work-with-us', label: 'Work with us', short: 'Sell' },
+  { to: '/guarantee', label: 'Guarantee', short: 'Guarantee' },
 ]
 
 export function MarketingHeader({ transparent = false }: { transparent?: boolean }) {
   const { itemCount } = useCart()
   const location = useLocation()
-  const onDark = transparent && location.pathname === '/'
+  const [overHero, setOverHero] = useState(true)
+
+  useEffect(() => {
+    if (!transparent || location.pathname !== '/') {
+      setOverHero(false)
+      return
+    }
+
+    const update = () => {
+      // Stay dark only while the first viewport (hero) is still dominant.
+      setOverHero(window.scrollY < window.innerHeight * 0.72)
+    }
+
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [transparent, location.pathname])
+
+  const onDark = transparent && location.pathname === '/' && overHero
 
   return (
     <header
-      className={`sticky top-0 z-50 border-b backdrop-blur-md ${
+      className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${
         onDark
-          ? 'border-white/10 bg-ink/55 text-white'
-          : 'border-line/70 bg-paper/90 text-ink'
+          ? 'border-white/10 bg-ink/70 text-white'
+          : 'border-line/70 bg-paper/95 text-ink'
       }`}
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="container-site flex h-16 items-center justify-between gap-4">
+      <div className="container-site flex h-14 items-center justify-between gap-2 sm:gap-3 md:h-16 md:gap-4">
         <Logo light={onDark} />
-        <nav className="hidden items-center gap-1 md:flex">
+
+        <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
           {marketingNav.map((item) => (
             <NavLink
               key={item.to}
@@ -94,53 +122,88 @@ export function MarketingHeader({ transparent = false }: { transparent?: boolean
             </NavLink>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
+
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Link
             to={appPath('/cart')}
-            className={`relative rounded-full px-3 py-2 text-sm font-semibold transition ${
+            className={`relative inline-flex items-center justify-center rounded-full px-2.5 py-2 text-sm font-semibold transition sm:px-3 ${
               onDark ? 'bg-white/10 hover:bg-white/15' : 'bg-mist hover:bg-line/50'
             }`}
+            aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
           >
-            Cart
+            <span className="sm:hidden" aria-hidden>
+              <CartIcon />
+            </span>
+            <span className="hidden sm:inline">Cart</span>
             {itemCount > 0 && (
               <motion.span
                 key={itemCount}
                 initial={{ scale: 0.6, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={springSnap}
-                className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white"
+                className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white sm:static sm:ml-1.5"
               >
                 {itemCount}
               </motion.span>
             )}
           </Link>
-          <AppEntryButton className="btn-primary hidden !py-2.5 !text-sm sm:inline-flex">
-            Open app
+          <AppEntryButton
+            className={`inline-flex items-center justify-center rounded-full bg-mango px-3 py-2 text-xs font-extrabold text-white transition hover:bg-mango-deep sm:px-3.5 sm:py-2.5 sm:text-sm ${
+              onDark ? 'shadow-[0_2px_0_#9a4f16]' : ''
+            }`}
+          >
+            Order
           </AppEntryButton>
         </div>
       </div>
-      <div className="container-site flex gap-1 overflow-x-auto pb-3 md:hidden">
+
+      {/* Mobile secondary nav — single scroll row, no tall wrap */}
+      <nav
+        className="container-site -mx-0 flex gap-1.5 overflow-x-auto pb-2.5 pt-0 [-ms-overflow-style:none] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
+        aria-label="Site"
+      >
         {marketingNav.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${
+              `shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap ${
                 isActive
                   ? onDark
-                    ? 'bg-white/15'
+                    ? 'bg-white/18 text-white'
                     : 'bg-ink text-white'
                   : onDark
-                    ? 'bg-white/5 text-white/70'
+                    ? 'bg-white/8 text-white/75'
                     : 'bg-mist text-muted'
               }`
             }
           >
-            {item.label}
+            {item.short}
           </NavLink>
         ))}
-      </div>
+      </nav>
     </header>
+  )
+}
+
+function CartIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M6 6h15l-1.5 9h-12L6 6Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 6 5 3H2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle cx="9" cy="20" r="1.25" fill="currentColor" />
+      <circle cx="17" cy="20" r="1.25" fill="currentColor" />
+    </svg>
   )
 }
 
@@ -203,6 +266,21 @@ export function SiteFooter() {
             <li>
               <Link to="/how" className="hover:text-white">
                 How it works
+              </Link>
+            </li>
+            <li>
+              <Link to="/work-with-us" className="hover:text-white">
+                Work with us
+              </Link>
+            </li>
+            <li>
+              <Link to="/vendor/signup" className="hover:text-white">
+                Register a business
+              </Link>
+            </li>
+            <li>
+              <Link to="/vendor/login" className="hover:text-white">
+                Vendor board
               </Link>
             </li>
             <li>

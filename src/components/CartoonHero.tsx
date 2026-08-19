@@ -114,7 +114,7 @@ export function CartoonHero() {
           </motion.span>
         ))}
 
-      <div className="container-site relative z-10 flex min-h-[100svh] flex-col justify-end pb-16 pt-28 md:justify-center md:pb-24 md:pt-24">
+      <div className="container-site relative z-10 flex min-h-[100svh] flex-col justify-end pb-[max(4rem,env(safe-area-inset-bottom))] pt-[calc(6.75rem+env(safe-area-inset-top))] sm:pt-[calc(7rem+env(safe-area-inset-top))] md:justify-center md:pb-24 md:pt-24">
         <motion.p
           className="inline-flex w-fit items-center gap-2 rounded-full border-[3px] border-ink bg-dusk px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-ink shadow-[3px_3px_0_#020a0c]"
           initial={reduce ? false : { opacity: 0, y: -16, rotate: -6 }}
@@ -125,7 +125,7 @@ export function CartoonHero() {
         </motion.p>
 
         <h1
-          className="mt-5 flex flex-wrap font-display text-[3.4rem] font-bold leading-[0.95] tracking-[-0.03em] sm:text-[4.6rem] md:text-[5.6rem]"
+          className="mt-5 flex flex-wrap font-display text-[clamp(2.75rem,14vw,3.4rem)] font-bold leading-[0.95] tracking-[-0.03em] sm:text-[4.6rem] md:text-[5.6rem]"
           aria-label={SITE.name}
         >
           {letters.map((ch, i) => (
@@ -190,23 +190,23 @@ export function CartoonHero() {
         </motion.p>
 
         <motion.div
-          className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center"
+          className="mt-8 flex w-full max-w-lg flex-col gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center"
           initial={reduce ? false : { opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...springPop, delay: 0.8 }}
         >
-          <AppEntryButton className="btn-primary">Order in Badagry →</AppEntryButton>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <InstallPrompt compact />
-            <MotionLink
-              to="/how"
-              className="btn-secondary"
-              whileHover={hoverLift}
-              whileTap={tapPress}
-            >
-              How it works
-            </MotionLink>
-          </div>
+          <AppEntryButton className="btn-primary w-full sm:w-auto">
+            Order in Badagry →
+          </AppEntryButton>
+          <InstallPrompt compact />
+          <MotionLink
+            to="/how"
+            className="btn-secondary w-full sm:w-auto"
+            whileHover={hoverLift}
+            whileTap={tapPress}
+          >
+            How it works
+          </MotionLink>
         </motion.div>
       </div>
     </section>

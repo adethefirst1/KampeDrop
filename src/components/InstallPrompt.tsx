@@ -143,7 +143,11 @@ export function InstallPrompt({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <>
-        <button type="button" className="btn-secondary" onClick={() => setOpen(true)}>
+        <button
+          type="button"
+          className="btn-secondary w-full sm:w-auto"
+          onClick={() => setOpen(true)}
+        >
           {label}
         </button>
         <AppGuideSheet open={open} onClose={() => setOpen(false)} mode="install" />
@@ -166,11 +170,13 @@ export function InstallPrompt({ compact = false }: { compact?: boolean }) {
           exit={{ y: 60, opacity: 0 }}
           transition={springSoft}
         >
-          <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-white/10 bg-ink px-4 py-3.5 text-white shadow-[0_12px_40px_rgba(14,28,24,0.4)]">
-            <img src="/icons/icon-192.png" alt="" className="h-11 w-11 rounded-xl" />
+          <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-2 rounded-2xl border border-white/10 bg-ink px-3 py-3 text-white shadow-[0_12px_40px_rgba(14,28,24,0.4)] sm:gap-3 sm:px-4 sm:py-3.5">
+            <img src="/icons/icon-192.png" alt="" className="h-10 w-10 shrink-0 rounded-xl sm:h-11 sm:w-11" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold">Put KampeDrop on your home screen</p>
-              <p className="text-xs text-white/60">We’ll show you the exact steps for your phone.</p>
+              <p className="text-sm font-bold leading-snug">Put KampeDrop on your home screen</p>
+              <p className="hidden text-xs text-white/60 sm:block">
+                We’ll show you the exact steps for your phone.
+              </p>
             </div>
             <button
               type="button"
@@ -182,7 +188,7 @@ export function InstallPrompt({ compact = false }: { compact?: boolean }) {
             <button
               type="button"
               onClick={dismiss}
-              className="shrink-0 text-xs font-semibold text-white/45 hover:text-white"
+              className="shrink-0 px-1 text-xs font-semibold text-white/45 hover:text-white"
               aria-label="Dismiss"
             >
               ✕

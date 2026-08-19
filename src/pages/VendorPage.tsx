@@ -3,10 +3,11 @@ import { useState } from 'react'
 import { appPath } from '../paths'
 import { AnimatePresence, motion } from 'motion/react'
 import { AppShell } from '../components/layout'
+import { VendorInfoSheet } from '../components/VendorInfoSheet'
 import { MotionItem, Stagger } from '../components/motion'
 import { useCart } from '../context/CartContext'
 import { useCatalog } from '../context/CatalogContext'
-import { categoryLabel, formatNaira, type MenuItem } from '../data/vendors'
+import { categoryLabel, formatNaira, isBuyerVisible, type MenuItem } from '../data/vendors'
 import { fadeUp, springSnap, tapPress } from '../motion/tokens'
 
 export function VendorPage() {
@@ -15,9 +16,9 @@ export function VendorPage() {
   const vendor = getVendor(vendorId ?? '')
   const { addItem, setQty, lines } = useCart()
   const [toast, setToast] = useState<string | null>(null)
-  const [trustOpen, setTrustOpen] = useState(false)
+  const [infoOpen, setInfoOpen] = useState(false)
 
-  if (!vendor || !vendor.active) {
+  if (!vendor || !isBuyerVisible(vendor)) {
     return (
       <AppShell showInstallTip={false}>
         <div className="py-16 text-center">
@@ -50,13 +51,14 @@ export function VendorPage() {
     flash(result.ok ? `Added ${item.name}` : result.reason)
   }
 
+  const menuItems = vendor.items.filter((it) => it.available !== false)
+
   return (
     <AppShell showInstallTip={false}>
       <Link to={appPath()} className="text-sm font-semibold text-muted hover:text-ink">
         ← Vendors
       </Link>
 
-      {/* Compact vendor header — menu is the job */}
       <div className="mt-3 flex items-start gap-3">
         <span
           className="mt-1 h-10 w-1.5 shrink-0 rounded-full"
@@ -67,37 +69,45 @@ export function VendorPage() {
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-lagoon">
             {categoryLabel[vendor.category]} · {vendor.area}
           </p>
-          <h1 className="mt-1 font-display text-[1.75rem] font-semibold leading-tight tracking-[-0.03em]">
-            {vendor.name}
-          </h1>
+          <div className="mt-1 flex items-start gap-2">
+            <h1 className="min-w-0 flex-1 font-display text-[1.75rem] font-semibold leading-tight tracking-[-0.03em]">
+              {vendor.name}
+            </h1>
+            <button
+              type="button"
+              onClick={() => setInfoOpen(true)}
+              className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-mist text-sm font-extrabold text-ink ring-1 ring-line"
+              aria-label="More about this vendor"
+              title="More info"
+            >
+              ⓘ
+            </button>
+          </div>
+          <p className="mt-1.5 line-clamp-2 text-sm text-muted">{vendor.tagline}</p>
           <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-bold text-ink-soft">
             <span className="rounded-lg bg-mist px-2 py-1">~{vendor.etaMins} min</span>
             <span className="rounded-lg bg-mist px-2 py-1">★ {vendor.rating}</span>
             <span className="rounded-lg bg-mango/15 px-2 py-1 text-mango-deep">Vetted</span>
+            {!vendor.acceptingOrders && (
+              <span className="rounded-lg bg-ink/10 px-2 py-1 text-ink-soft">Paused</span>
+            )}
           </div>
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setTrustOpen((o) => !o)}
-        className="mt-3 w-full rounded-xl bg-paper px-3 py-2.5 text-left text-xs font-semibold text-muted ring-1 ring-line"
-      >
-        {trustOpen ? 'Hide' : 'Why we trust them'} · tap
-        {trustOpen && (
-          <p className="mt-2 text-sm font-normal leading-relaxed text-ink-soft">
-            {vendor.vettedNote}
-          </p>
-        )}
-      </button>
+      {!vendor.acceptingOrders && (
+        <p className="mt-3 rounded-xl bg-mist px-3 py-2.5 text-sm font-semibold text-ink-soft">
+          This shop paused new orders for now. Browse another vendor nearby.
+        </p>
+      )}
 
       <div className="mt-6 flex items-end justify-between gap-3">
         <h2 className="font-display text-xl font-semibold tracking-[-0.02em]">Menu</h2>
-        <p className="text-xs font-semibold text-muted">{vendor.items.length} items</p>
+        <p className="text-xs font-semibold text-muted">{menuItems.length} items</p>
       </div>
 
       <Stagger className="mt-3 space-y-2.5" as="ul" fast immediate>
-        {vendor.items.map((item) => {
+        {menuItems.map((item) => {
           const qty = qtyFor(item.id)
           return (
             <MotionItem
@@ -126,43 +136,44 @@ export function VendorPage() {
                   </p>
                 </div>
 
-                {qty === 0 ? (
-                  <motion.button
-                    type="button"
-                    whileTap={tapPress}
-                    onClick={() => onAdd(item)}
-                    className="shrink-0 rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-white"
-                  >
-                    Add
-                  </motion.button>
-                ) : (
-                  <div className="flex shrink-0 items-center gap-1 rounded-xl bg-mist p-1">
-                    <button
+                {vendor.acceptingOrders &&
+                  (qty === 0 ? (
+                    <motion.button
                       type="button"
-                      aria-label="Decrease"
-                      onClick={() => setQty(item.id, qty - 1)}
-                      className="grid h-9 w-9 place-items-center rounded-lg bg-paper text-lg font-bold ring-1 ring-line"
-                    >
-                      −
-                    </button>
-                    <span className="min-w-7 text-center text-sm font-bold">{qty}</span>
-                    <button
-                      type="button"
-                      aria-label="Increase"
+                      whileTap={tapPress}
                       onClick={() => onAdd(item)}
-                      className="grid h-9 w-9 place-items-center rounded-lg bg-ink text-lg font-bold text-white"
+                      className="shrink-0 rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-white"
                     >
-                      +
-                    </button>
-                  </div>
-                )}
+                      Add
+                    </motion.button>
+                  ) : (
+                    <div className="flex shrink-0 items-center gap-1 rounded-xl bg-mist p-1">
+                      <button
+                        type="button"
+                        aria-label="Decrease"
+                        onClick={() => setQty(item.id, qty - 1)}
+                        className="grid h-9 w-9 place-items-center rounded-lg bg-paper text-lg font-bold ring-1 ring-line"
+                      >
+                        −
+                      </button>
+                      <span className="min-w-7 text-center text-sm font-bold">{qty}</span>
+                      <button
+                        type="button"
+                        aria-label="Increase"
+                        onClick={() => onAdd(item)}
+                        className="grid h-9 w-9 place-items-center rounded-lg bg-ink text-lg font-bold text-white"
+                      >
+                        +
+                      </button>
+                    </div>
+                  ))}
               </div>
             </MotionItem>
           )
         })}
       </Stagger>
 
-      {vendor.items.length === 0 && (
+      {menuItems.length === 0 && (
         <div className="mt-10 rounded-[1.5rem] bg-paper px-5 py-10 text-center ring-1 ring-line">
           <p className="font-display text-xl font-semibold tracking-[-0.02em]">
             Menu coming soon
@@ -176,6 +187,12 @@ export function VendorPage() {
           </Link>
         </div>
       )}
+
+      <VendorInfoSheet
+        vendor={vendor}
+        open={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
 
       <AnimatePresence>
         {toast && (

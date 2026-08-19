@@ -14,6 +14,7 @@ import { easeOut, fadeUp, springSoft, tapPress } from '../motion/tokens'
 const MotionLink = motion.create(Link)
 
 function NeighbourhoodMarquee() {
+  const reduce = useReducedMotion()
   const places = [...SITE.neighbourhoods, ...SITE.neighbourhoods]
   return (
     <div className="overflow-hidden border-y-4 border-ink bg-dusk py-5">
@@ -21,10 +22,16 @@ function NeighbourhoodMarquee() {
         We know these roads 🛵
       </p>
       <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-dusk to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-dusk to-transparent" />
-        <div className="flex w-max marquee gap-3 pr-3">
-          {places.map((place, i) => (
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-dusk to-transparent sm:w-16" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-dusk to-transparent sm:w-16" />
+        <div
+          className={
+            reduce
+              ? 'flex flex-wrap justify-center gap-3 px-3'
+              : 'flex w-max gap-3 pr-3 marquee'
+          }
+        >
+          {(reduce ? SITE.neighbourhoods : places).map((place, i) => (
             <span
               key={`${place}-${i}`}
               className="shrink-0 rounded-full border-2 border-ink bg-paper px-4 py-2 text-sm font-extrabold text-ink"
@@ -228,6 +235,12 @@ export function HomePage() {
                 Small on purpose — from Hospital Road kitchens to Ajara staples and Aradagun grill.
                 If they’re here, we’ve looked them in the eye.
               </p>
+              <Link
+                to="/work-with-us"
+                className="mt-4 inline-flex text-sm font-bold text-lagoon hover:underline"
+              >
+                Own a kitchen or shop? Work with us →
+              </Link>
             </Reveal>
             <Reveal>
               <AppEntryButton className="btn-ink shrink-0">Browse vendors</AppEntryButton>
@@ -240,13 +253,13 @@ export function HomePage() {
                 <MotionLink
                   to={appPath(`/vendors/${vendor.id}`)}
                   className="group block h-full overflow-hidden rounded-[1.5rem] bg-mist ring-1 ring-line"
-                  whileHover={{ y: -6, transition: springSoft }}
-                  whileTap={tapPress}
+                  whileHover={reduce ? undefined : { y: -6, transition: springSoft }}
+                  whileTap={reduce ? undefined : tapPress}
                 >
                   <motion.div
                     className="h-1.5 w-full origin-left"
                     style={{ background: vendor.accent }}
-                    initial={{ scaleX: 0 }}
+                    initial={reduce ? false : { scaleX: 0 }}
                     whileInView={{ scaleX: 1 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.7, ease: easeOut }}

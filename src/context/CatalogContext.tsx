@@ -9,19 +9,56 @@ import {
 } from 'react'
 import {
   emptyVendorDraft,
+  isBuyerVisible,
+  normalizePhoneDigits,
   seedVendors,
   slugifyItemId,
+  VENDOR_DEMO_PIN,
   type MenuItem,
+  type VerificationStatus,
   type Vendor,
 } from '../data/vendors'
 
 export const CATALOG_STORAGE_KEY = 'kampedrop-catalog'
 
+export type VendorApplicationInput = {
+  name: string
+  category: Vendor['category']
+  area: string
+  pickupSpot: string
+  phone: string
+  accessPin: string
+  hours: string
+  about: string
+  tagline: string
+  photos: string[]
+}
+
+/** Fields vendors may edit themselves (name / address / photos stay ops-locked). */
+export type VendorSelfPatch = Partial<
+  Pick<Vendor, 'tagline' | 'about' | 'phone' | 'hours' | 'etaMins' | 'acceptingOrders'>
+>
+
 type CatalogContextValue = {
   vendors: Vendor[]
   activeVendors: Vendor[]
+  pendingVendors: Vendor[]
   getVendor: (id: string) => Vendor | undefined
+  findVendorByPhone: (phone: string) => Vendor | undefined
   saveVendor: (vendor: Vendor) => Vendor
+  patchVendorSelf: (id: string, patch: VendorSelfPatch) => void
+  /**
+   * @deprecated Live signup uses `submitVendorApplication` in `src/lib/vendorsApi.ts`
+   * (Supabase RPC). Do not call this — it only writes localStorage and is retired.
+   */
+  submitApplication: (
+    input: VendorApplicationInput,
+  ) => { ok: true; vendor: Vendor } | { ok: false; reason: string }
+  setVerification: (
+    id: string,
+    status: VerificationStatus,
+    reviewNote?: string | null,
+  ) => void
   deleteVendor: (id: string) => void
   setVendorActive: (id: string, active: boolean) => void
   upsertItem: (vendorId: string, item: MenuItem) => void
@@ -32,14 +69,33 @@ type CatalogContextValue = {
 const CatalogContext = createContext<CatalogContextValue | null>(null)
 
 function normalizeVendor(raw: Vendor): Vendor {
+  const seed = seedVendors.find((v) => v.id === raw.id)
+  const verificationStatus: VerificationStatus =
+    raw.verificationStatus ?? (seed ? 'approved' : 'pending')
   return {
     ...raw,
-    phone: raw.phone ?? '',
+    phone: raw.phone ?? seed?.phone ?? '',
+    about: raw.about || seed?.about || raw.tagline || '',
+    hours: raw.hours || seed?.hours || 'Hours on request',
+    lat: typeof raw.lat === 'number' ? raw.lat : (seed?.lat ?? null),
+    lng: typeof raw.lng === 'number' ? raw.lng : (seed?.lng ?? null),
+    photos:
+      Array.isArray(raw.photos) && raw.photos.length
+        ? raw.photos
+        : (seed?.photos ?? []),
+    acceptingOrders: raw.acceptingOrders !== false,
     pickupSpot:
       raw.pickupSpot?.trim() ||
+      seed?.pickupSpot ||
       (raw.area ? `${raw.area} — ${raw.name}` : raw.name),
-    active: raw.active !== false,
-    items: Array.isArray(raw.items) ? raw.items : [],
+    verificationStatus,
+    submittedAt: raw.submittedAt ?? null,
+    reviewNote: raw.reviewNote ?? null,
+    accessPin: raw.accessPin?.trim() || VENDOR_DEMO_PIN,
+    active: verificationStatus === 'approved' ? raw.active !== false : false,
+    items: Array.isArray(raw.items)
+      ? raw.items.map((it) => ({ ...it, available: it.available !== false }))
+      : [],
   }
 }
 
@@ -55,7 +111,7 @@ function loadCatalog(): Vendor[] {
   } catch {
     /* ignore */
   }
-  return seedVendors.map((v) => structuredClone(v))
+  return seedVendors.map((v) => structuredClone(v)).map(normalizeVendor)
 }
 
 export function CatalogProvider({ children }: { children: ReactNode }) {
@@ -74,6 +130,22 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     [vendors],
   )
 
+  const findVendorByPhone = useCallback(
+    (phone: string) => {
+      const digits = normalizePhoneDigits(phone)
+      if (digits.length < 10) return undefined
+      return vendors.find((v) => {
+        const d = normalizePhoneDigits(v.phone)
+        return (
+          d === digits ||
+          d.endsWith(digits.slice(-10)) ||
+          digits.endsWith(d.slice(-10))
+        )
+      })
+    },
+    [vendors],
+  )
+
   const saveVendor = useCallback((vendor: Vendor) => {
     const next = normalizeVendor(vendor)
     setVendors((prev) => {
@@ -86,12 +158,73 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     return next
   }, [])
 
+  /** @deprecated Use submitVendorApplication (vendorsApi) — localStorage signup is retired. */
+  const submitApplication = useCallback((_input: VendorApplicationInput) => {
+    console.warn(
+      '[CatalogContext] submitApplication is deprecated. Live signup uses submit_vendor_application via vendorsApi.',
+    )
+    return {
+      ok: false as const,
+      reason:
+        'Local signup is retired. Use the online registration form (Supabase submit_vendor_application).',
+    }
+  }, [])
+
+  const setVerification = useCallback(
+    (id: string, status: VerificationStatus, reviewNote: string | null = null) => {
+      setVendors((prev) =>
+        prev.map((v) => {
+          if (v.id !== id) return v
+          const approved = status === 'approved'
+          return normalizeVendor({
+            ...v,
+            verificationStatus: status,
+            reviewNote,
+            active: approved,
+            acceptingOrders: approved ? true : false,
+            vettedNote: approved
+              ? v.vettedNote?.includes('Awaiting')
+                ? 'Verified by KampeDrop for Badagry fulfilment.'
+                : v.vettedNote || 'Verified by KampeDrop for Badagry fulfilment.'
+              : v.vettedNote,
+          })
+        }),
+      )
+    },
+    [],
+  )
+
+  const patchVendorSelf = useCallback((id: string, patch: VendorSelfPatch) => {
+    setVendors((prev) =>
+      prev.map((v) => {
+        if (v.id !== id) return v
+        return normalizeVendor({
+          ...v,
+          tagline: patch.tagline ?? v.tagline,
+          about: patch.about ?? v.about,
+          phone: patch.phone ?? v.phone,
+          hours: patch.hours ?? v.hours,
+          etaMins: patch.etaMins ?? v.etaMins,
+          acceptingOrders: patch.acceptingOrders ?? v.acceptingOrders,
+        })
+      }),
+    )
+  }, [])
+
   const deleteVendor = useCallback((id: string) => {
     setVendors((prev) => prev.filter((v) => v.id !== id))
   }, [])
 
   const setVendorActive = useCallback((id: string, active: boolean) => {
-    setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, active } : v)))
+    setVendors((prev) =>
+      prev.map((v) => {
+        if (v.id !== id) return v
+        if (v.verificationStatus !== 'approved') {
+          return normalizeVendor({ ...v, active: false })
+        }
+        return normalizeVendor({ ...v, active })
+      }),
+    )
   }, [])
 
   const upsertItem = useCallback((vendorId: string, item: MenuItem) => {
@@ -118,11 +251,18 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const resetCatalog = useCallback(() => {
-    setVendors(seedVendors.map((v) => structuredClone(v)))
+    setVendors(seedVendors.map((v) => structuredClone(v)).map(normalizeVendor))
   }, [])
 
-  const activeVendors = useMemo(
-    () => vendors.filter((v) => v.active),
+  const activeVendors = useMemo(() => vendors.filter(isBuyerVisible), [vendors])
+
+  const pendingVendors = useMemo(
+    () =>
+      vendors.filter(
+        (v) =>
+          v.verificationStatus === 'pending' ||
+          v.verificationStatus === 'needs_info',
+      ),
     [vendors],
   )
 
@@ -130,8 +270,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     () => ({
       vendors,
       activeVendors,
+      pendingVendors,
       getVendor,
+      findVendorByPhone,
       saveVendor,
+      patchVendorSelf,
+      submitApplication,
+      setVerification,
       deleteVendor,
       setVendorActive,
       upsertItem,
@@ -141,8 +286,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     [
       vendors,
       activeVendors,
+      pendingVendors,
       getVendor,
+      findVendorByPhone,
       saveVendor,
+      patchVendorSelf,
+      submitApplication,
+      setVerification,
       deleteVendor,
       setVendorActive,
       upsertItem,
@@ -169,6 +319,7 @@ export function createMenuItem(partial: Partial<MenuItem> & { name: string }): M
     description: partial.description ?? '',
     price: partial.price ?? 0,
     popular: partial.popular,
+    available: partial.available !== false,
   }
 }
 

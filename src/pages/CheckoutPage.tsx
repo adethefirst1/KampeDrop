@@ -5,6 +5,7 @@ import { OrderLayout, StickyCommerceBar } from '../components/layout'
 import { PlacePicker } from '../components/PlacePicker'
 import { useCart, type Fulfillment } from '../context/CartContext'
 import { useOps } from '../context/OpsContext'
+import { useVendor } from '../context/VendorContext'
 import type { DeliveryPlace } from '../data/places'
 import { DELIVERY_FEE, formatNaira } from '../data/vendors'
 import { isOrderRateLimitError, saveOrderToSupabase } from '../lib/ordersApi'
@@ -12,6 +13,7 @@ import { isOrderRateLimitError, saveOrderToSupabase } from '../lib/ordersApi'
 export function CheckoutPage() {
   const { itemCount, subtotal, vendor, draftOrder, commitOrder } = useCart()
   const { ingestPlacedOrder } = useOps()
+  const { ingestOrder: ingestVendorOrder } = useVendor()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [fulfillment, setFulfillment] = useState<Fulfillment>('delivery')
@@ -83,6 +85,7 @@ export function CheckoutPage() {
 
       commitOrder(order)
       ingestPlacedOrder(order)
+      ingestVendorOrder(order)
       setPlacedId(order.id)
     } catch {
       setSubmitError('Could not place your order right now. Please try again.')

@@ -16,58 +16,176 @@ import {
 import { RequireOps } from './AdminShell'
 
 export function AdminVendorsPage() {
-  const { vendors, saveVendor, setVendorActive, resetCatalog } = useCatalog()
+  const {
+    vendors,
+    pendingVendors,
+    saveVendor,
+    setVendorActive,
+    setVerification,
+    resetCatalog,
+  } = useCatalog()
   const navigate = useNavigate()
   const [confirmReset, setConfirmReset] = useState(false)
 
   function addVendor() {
-    const draft = createVendor('New vendor')
+    const draft = createVendor('New business')
     draft.id = `vendor-${Date.now().toString(36)}`
+    draft.verificationStatus = 'approved'
+    draft.active = true
+    draft.acceptingOrders = true
+    draft.vettedNote = 'Added by KampeDrop ops.'
     saveVendor(draft)
     navigate(`/admin/vendors/${draft.id}`)
   }
+
+  const live = vendors.filter((v) => v.verificationStatus === 'approved')
+  const other = vendors.filter(
+    (v) =>
+      v.verificationStatus !== 'approved' &&
+      v.verificationStatus !== 'pending' &&
+      v.verificationStatus !== 'needs_info',
+  )
 
   return (
     <RequireOps>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-[-0.03em]">
-            Vendor catalog
+            Businesses
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Add and edit menus here — changes show in the buyer app immediately.
+            Approve new applications before they appear to buyers.
           </p>
         </div>
         <button type="button" className="btn-primary" onClick={addVendor}>
-          Add vendor
+          Add business
         </button>
       </div>
 
-      <ul className="mt-6 space-y-3">
-        {vendors.map((v) => (
-          <li key={v.id}>
-            <div className="flex items-center gap-3 rounded-[1.35rem] bg-paper p-4 ring-1 ring-line">
-              <Link to={`/admin/vendors/${v.id}`} className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-lagoon">
-                  {categoryLabel[v.category]} · {v.area}
-                  {!v.active && ' · Hidden'}
-                </p>
-                <p className="mt-1 font-semibold">{v.name}</p>
-                <p className="mt-0.5 text-sm text-muted">
-                  {v.items.length} items · {v.phone || 'No phone'}
-                </p>
-              </Link>
-              <button
-                type="button"
-                onClick={() => setVendorActive(v.id, !v.active)}
-                className="shrink-0 rounded-full bg-mist px-3 py-1.5 text-xs font-bold"
+      {pendingVendors.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-mango-deep">
+            Awaiting verification · {pendingVendors.length}
+          </h2>
+          <ul className="mt-3 space-y-3">
+            {pendingVendors.map((v) => (
+              <li
+                key={v.id}
+                className="rounded-[1.35rem] border-[2px] border-dusk bg-paper p-4 shadow-[3px_3px_0_#06181C]"
               >
-                {v.active ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+                <Link to={`/admin/vendors/${v.id}`} className="block">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-lagoon">
+                    {categoryLabel[v.category]} · {v.area} ·{' '}
+                    {v.verificationStatus === 'needs_info' ? 'Needs info' : 'Pending'}
+                  </p>
+                  <p className="mt-1 font-semibold">{v.name}</p>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {v.pickupSpot} · {v.phone}
+                  </p>
+                  {v.photos[0] && (
+                    <div className="mt-3 flex gap-2 overflow-x-auto">
+                      {v.photos.slice(0, 4).map((src) => (
+                        <img
+                          key={src.slice(0, 24)}
+                          src={src}
+                          alt=""
+                          className="h-16 w-16 shrink-0 rounded-lg object-cover ring-1 ring-line"
+                        />
+                      ))}
+                    </div>
+                  )}
+                </Link>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded-full bg-lagoon px-3 py-1.5 text-xs font-bold text-white"
+                    onClick={() => setVerification(v.id, 'approved')}
+                  >
+                    Approve · go live
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full bg-mist px-3 py-1.5 text-xs font-bold"
+                    onClick={() => {
+                      const note = window.prompt(
+                        'What should they fix?',
+                        'Please add clearer storefront photos.',
+                      )
+                      if (note) setVerification(v.id, 'needs_info', note)
+                    }}
+                  >
+                    Need more info
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full bg-mist px-3 py-1.5 text-xs font-bold text-mango-deep"
+                    onClick={() => {
+                      const note = window.prompt('Rejection note (optional)')
+                      setVerification(v.id, 'rejected', note || 'Not approved for KampeDrop.')
+                    }}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="mt-10">
+        <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-lagoon">
+          Live on buyer app · {live.length}
+        </h2>
+        <ul className="mt-3 space-y-3">
+          {live.map((v) => (
+            <li key={v.id}>
+              <div className="flex items-center gap-3 rounded-[1.35rem] bg-paper p-4 ring-1 ring-line">
+                <Link to={`/admin/vendors/${v.id}`} className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-lagoon">
+                    {categoryLabel[v.category]} · {v.area}
+                    {!v.active && ' · Hidden'}
+                  </p>
+                  <p className="mt-1 font-semibold">{v.name}</p>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {v.items.length} items · {v.phone || 'No phone'}
+                  </p>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setVendorActive(v.id, !v.active)}
+                  className="shrink-0 rounded-full bg-mist px-3 py-1.5 text-xs font-bold"
+                >
+                  {v.active ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {other.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted">
+            Other · {other.length}
+          </h2>
+          <ul className="mt-3 space-y-3">
+            {other.map((v) => (
+              <li key={v.id}>
+                <Link
+                  to={`/admin/vendors/${v.id}`}
+                  className="block rounded-[1.35rem] bg-paper p-4 ring-1 ring-line"
+                >
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+                    {v.verificationStatus} · {v.area}
+                  </p>
+                  <p className="mt-1 font-semibold">{v.name}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="mt-10 border-t border-line pt-6">
         {!confirmReset ? (
@@ -81,7 +199,7 @@ export function AdminVendorsPage() {
         ) : (
           <div className="rounded-2xl bg-mist p-4">
             <p className="text-sm font-semibold">
-              This replaces all vendors with the original pilot list.
+              This replaces all businesses with the original pilot list.
             </p>
             <div className="mt-3 flex gap-2">
               <button

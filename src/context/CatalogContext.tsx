@@ -18,6 +18,11 @@ import {
   type VerificationStatus,
   type Vendor,
 } from '../data/vendors'
+import {
+  fetchLiveVendors,
+  listVendorApplicationPhotoUrls,
+  vendorRowToVendor,
+} from '../lib/vendorsApi'
 
 export const CATALOG_STORAGE_KEY = 'kampedrop-catalog'
 
@@ -116,6 +121,7 @@ function loadCatalog(): Vendor[] {
 
 export function CatalogProvider({ children }: { children: ReactNode }) {
   const [vendors, setVendors] = useState<Vendor[]>(loadCatalog)
+  const [cloudVendors, setCloudVendors] = useState<Vendor[]>([])
 
   useEffect(() => {
     try {
@@ -125,16 +131,41 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     }
   }, [vendors])
 
+  useEffect(() => {
+    let cancelled = false
+    async function loadCloud() {
+      const result = await fetchLiveVendors()
+      if (cancelled || !result.ok) return
+      const mapped = await Promise.all(
+        result.vendors.map(async (row) =>
+          vendorRowToVendor(row, await listVendorApplicationPhotoUrls(row.id)),
+        ),
+      )
+      if (!cancelled) setCloudVendors(mapped)
+    }
+    void loadCloud()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const mergedVendors = useMemo(() => {
+    const byId = new Map<string, Vendor>()
+    for (const v of vendors) byId.set(v.id, v)
+    for (const v of cloudVendors) byId.set(v.id, v)
+    return [...byId.values()]
+  }, [vendors, cloudVendors])
+
   const getVendor = useCallback(
-    (id: string) => vendors.find((v) => v.id === id),
-    [vendors],
+    (id: string) => mergedVendors.find((v) => v.id === id),
+    [mergedVendors],
   )
 
   const findVendorByPhone = useCallback(
     (phone: string) => {
       const digits = normalizePhoneDigits(phone)
       if (digits.length < 10) return undefined
-      return vendors.find((v) => {
+      return mergedVendors.find((v) => {
         const d = normalizePhoneDigits(v.phone)
         return (
           d === digits ||
@@ -143,7 +174,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         )
       })
     },
-    [vendors],
+    [mergedVendors],
   )
 
   const saveVendor = useCallback((vendor: Vendor) => {
@@ -254,7 +285,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     setVendors(seedVendors.map((v) => structuredClone(v)).map(normalizeVendor))
   }, [])
 
-  const activeVendors = useMemo(() => vendors.filter(isBuyerVisible), [vendors])
+  const activeVendors = useMemo(
+    () => mergedVendors.filter(isBuyerVisible),
+    [mergedVendors],
+  )
 
   const pendingVendors = useMemo(
     () =>
@@ -268,7 +302,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
-      vendors,
+      vendors: mergedVendors,
       activeVendors,
       pendingVendors,
       getVendor,
@@ -284,7 +318,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       resetCatalog,
     }),
     [
-      vendors,
+      mergedVendors,
       activeVendors,
       pendingVendors,
       getVendor,

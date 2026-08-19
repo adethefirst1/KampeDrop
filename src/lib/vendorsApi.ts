@@ -1,5 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from './supabase'
-import type { VerificationStatus } from '../data/vendors'
+import type { Category, VerificationStatus, Vendor } from '../data/vendors'
 
 export type SubmitVendorApplicationInput = {
   name: string
@@ -173,6 +173,68 @@ export async function updateVendorVerification(
 
   if (error) return { ok: false, reason: error.message }
   return { ok: true }
+}
+
+/** Buyer-visible vendors (RLS: approved + active). */
+export async function fetchLiveVendors(): Promise<
+  { ok: true; vendors: VendorRow[] } | { ok: false; reason: string }
+> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase
+    .from('vendors')
+    .select(
+      'id, name, category, area, phone, hours, about, lat, lng, verification_status, review_note, active, submitted_at, created_at',
+    )
+    .eq('verification_status', 'approved')
+    .eq('active', true)
+    .order('name', { ascending: true })
+
+  if (error) return { ok: false, reason: error.message }
+  return { ok: true, vendors: (data ?? []) as VendorRow[] }
+}
+
+/**
+ * Map a cloud vendors row (+ optional photo URLs) into the app Vendor shape.
+ * Menu items are empty until cloud menu sync exists.
+ */
+export function vendorRowToVendor(row: VendorRow, photos: string[] = []): Vendor {
+  const category = (
+    row.category === 'mart' || row.category === 'pharmacy' ? row.category : 'food'
+  ) as Category
+  const about = row.about?.trim() || ''
+  const pickupFromAbout = about.match(/Pickup \/ landmark:\s*(.+)/i)?.[1]?.trim()
+  return {
+    id: row.id,
+    name: row.name,
+    category,
+    area: row.area,
+    pickupSpot: pickupFromAbout || `${row.area} — ${row.name}`,
+    tagline: about.split('\n')[0]?.slice(0, 140) || 'Verified on KampeDrop.',
+    about: about || 'Verified partner on KampeDrop.',
+    etaMins: 35,
+    rating: 5,
+    orders: 'New',
+    accent: '#0c6560',
+    vettedNote: 'Verified by KampeDrop for Badagry fulfilment.',
+    phone: row.phone,
+    hours: row.hours?.trim() || 'Hours on request',
+    lat: row.lat,
+    lng: row.lng,
+    photos,
+    acceptingOrders: true,
+    active: row.active,
+    verificationStatus:
+      (row.verification_status as VerificationStatus) || 'approved',
+    submittedAt: row.submitted_at,
+    reviewNote: row.review_note,
+    accessPin: '',
+    items: [],
+  }
 }
 
 /** Public URLs for applications/{vendorId}/* photos. */

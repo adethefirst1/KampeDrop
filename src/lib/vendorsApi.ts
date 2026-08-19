@@ -84,6 +84,58 @@ export async function submitVendorApplication(
   return { ok: true, vendorId }
 }
 
+export type VendorLoginResult = {
+  id: string
+  name: string
+  verification_status: string
+  active: boolean
+}
+
+/**
+ * Live vendor board sign-in via SECURITY DEFINER RPC.
+ * Never receives pin_hash — only id, name, verification_status, active.
+ */
+export async function vendorLogin(
+  phone: string,
+  pin: string,
+): Promise<{ ok: true; vendor: VendorLoginResult } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return {
+      ok: false,
+      reason: 'Sign-in is unavailable right now (Supabase is not configured).',
+    }
+  }
+  const supabase = getSupabase()
+  if (!supabase) {
+    return { ok: false, reason: 'Sign-in is unavailable right now.' }
+  }
+
+  const { data, error } = await supabase.rpc('vendor_login', {
+    p_phone: phone,
+    p_pin: pin,
+  })
+
+  if (error) {
+    return { ok: false, reason: error.message }
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || typeof row !== 'object' || !('id' in row) || !row.id) {
+    return { ok: false, reason: 'Sign-in succeeded but no vendor was returned.' }
+  }
+
+  const r = row as Record<string, unknown>
+  return {
+    ok: true,
+    vendor: {
+      id: String(r.id),
+      name: String(r.name ?? ''),
+      verification_status: String(r.verification_status ?? ''),
+      active: Boolean(r.active),
+    },
+  }
+}
+
 /**
  * Upload onboarding photos to public bucket vendor-photos under
  * applications/{vendorId}/ — allowed by anon INSERT path policy.

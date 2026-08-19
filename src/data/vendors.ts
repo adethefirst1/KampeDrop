@@ -58,7 +58,7 @@ export type Vendor = {
 export const DELIVERY_FEE = 700
 export const SERVICE_AREA = 'Badagry'
 
-/** Demo PIN for pilot / seed businesses until real auth ships */
+/** Legacy field on seed/local catalog rows — not used for board auth. */
 export const VENDOR_DEMO_PIN = '1234'
 
 export const MIN_ONBOARDING_PHOTOS = 2

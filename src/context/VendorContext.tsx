@@ -9,7 +9,8 @@ import {
 } from 'react'
 import type { OrderStatus, PlacedOrder } from './CartContext'
 import { syncBuyerOrder } from '../data/ops'
-import { VENDOR_DEMO_PIN } from '../data/vendors'
+import { vendorLogin } from '../lib/vendorsApi'
+import type { VerificationStatus } from '../data/vendors'
 
 export const VENDOR_AUTH_KEY = 'kampedrop-vendor-session'
 export const VENDOR_ORDERS_KEY = 'kampedrop-vendor-orders-v1'
@@ -22,16 +23,22 @@ export type VendorOrder = PlacedOrder & {
 
 type VendorSession = {
   vendorId: string
+  name: string
+  verificationStatus: VerificationStatus | string
+  active: boolean
   signedInAt: string
 }
 
 type VendorContextValue = {
   vendorId: string | null
+  vendorName: string | null
+  verificationStatus: string | null
+  vendorActive: boolean | null
   authenticated: boolean
   login: (
-    vendorId: string,
+    phone: string,
     pin: string,
-  ) => { ok: true } | { ok: false; reason: string }
+  ) => Promise<{ ok: true } | { ok: false; reason: string }>
   logout: () => void
   orders: VendorOrder[]
   ordersForVendor: VendorOrder[]
@@ -125,12 +132,22 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  const login = useCallback((vendorId: string, pin: string) => {
-    if (!vendorId) return { ok: false as const, reason: 'Pick your shop.' }
-    if (pin.trim() !== VENDOR_DEMO_PIN) {
-      return { ok: false as const, reason: 'Wrong PIN. Demo PIN is 1234.' }
+  const login = useCallback(async (phone: string, pin: string) => {
+    if (!phone.trim()) return { ok: false as const, reason: 'Enter your business phone.' }
+    if (!/^\d{4}$/.test(pin.trim())) {
+      return { ok: false as const, reason: 'PIN must be exactly 4 digits.' }
     }
-    setSession({ vendorId, signedInAt: new Date().toISOString() })
+
+    const result = await vendorLogin(phone.trim(), pin.trim())
+    if (!result.ok) return { ok: false as const, reason: result.reason }
+
+    setSession({
+      vendorId: result.vendor.id,
+      name: result.vendor.name,
+      verificationStatus: result.vendor.verification_status,
+      active: result.vendor.active,
+      signedInAt: new Date().toISOString(),
+    })
     return { ok: true as const }
   }, [])
 
@@ -234,6 +251,9 @@ export function VendorProvider({ children }: { children: ReactNode }) {
   )
 
   const vendorId = session?.vendorId ?? null
+  const vendorName = session?.name ?? null
+  const verificationStatus = session?.verificationStatus ?? null
+  const vendorActive = session?.active ?? null
   const ordersForVendor = useMemo(
     () => (vendorId ? orders.filter((o) => o.vendorId === vendorId) : []),
     [orders, vendorId],
@@ -242,6 +262,9 @@ export function VendorProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       vendorId,
+      vendorName,
+      verificationStatus,
+      vendorActive,
       authenticated: Boolean(vendorId),
       login,
       logout,
@@ -256,6 +279,9 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     }),
     [
       vendorId,
+      vendorName,
+      verificationStatus,
+      vendorActive,
       login,
       logout,
       orders,

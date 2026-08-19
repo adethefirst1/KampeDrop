@@ -19,9 +19,17 @@ export function RequireVendor({ children }: { children: ReactNode }) {
 }
 
 export function VendorShell() {
-  const { vendorId, logout, ordersForVendor } = useVendor()
+  const {
+    vendorId,
+    vendorName,
+    verificationStatus: sessionStatus,
+    logout,
+    ordersForVendor,
+  } = useVendor()
   const { getVendor } = useCatalog()
   const vendor = getVendor(vendorId ?? '')
+  const displayName = vendor?.name ?? vendorName ?? 'Your business'
+  const status = vendor?.verificationStatus ?? sessionStatus
   const { pathname } = useLocation()
   const pending = ordersForVendor.filter(
     (o) =>
@@ -30,10 +38,7 @@ export function VendorShell() {
       !o.vendorConfirmed,
   ).length
   const awaitingReview =
-    vendor &&
-    (vendor.verificationStatus === 'pending' ||
-      vendor.verificationStatus === 'needs_info' ||
-      vendor.verificationStatus === 'draft')
+    status === 'pending' || status === 'needs_info' || status === 'draft'
 
   const tabs = [
     { to: vendorPath(), label: 'Orders', end: true },
@@ -50,7 +55,7 @@ export function VendorShell() {
               {SITE.name} Vendor
             </p>
             <p className="truncate font-display text-lg font-bold leading-tight tracking-[-0.02em]">
-              {vendor?.name ?? 'Your business'}
+              {displayName}
             </p>
           </div>
           <button
@@ -89,12 +94,12 @@ export function VendorShell() {
         <div className="border-b border-dusk/40 bg-dusk/90 px-4 py-3 text-ink">
           <div className="mx-auto max-w-lg">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.14em]">
-              {vendor.verificationStatus === 'needs_info'
+              {status === 'needs_info'
                 ? 'More information needed'
                 : 'Verification in progress'}
             </p>
             <p className="mt-1 text-sm font-semibold leading-snug">
-              {vendor.verificationStatus === 'needs_info' && vendor.reviewNote
+              {status === 'needs_info' && vendor?.reviewNote
                 ? vendor.reviewNote
                 : 'You’re not visible to customers yet. We typically complete review within 24 hours of a complete submission.'}
             </p>
@@ -102,7 +107,7 @@ export function VendorShell() {
         </div>
       )}
 
-      {vendor?.verificationStatus === 'rejected' && (
+      {status === 'rejected' && (
         <div className="border-b border-mango/30 bg-mango/15 px-4 py-3 text-mango-deep">
           <div className="mx-auto max-w-lg">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.14em]">

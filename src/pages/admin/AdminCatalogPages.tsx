@@ -23,13 +23,191 @@ import { RequireOps } from './AdminShell'
 
 type CloudApp = VendorRow & { photos: string[] }
 
+type ReviewAction = 'needs_info' | 'reject' | null
+
+function CloudApplicationCard({
+  app,
+  busy,
+  onApprove,
+  onNeedsInfo,
+  onReject,
+}: {
+  app: CloudApp
+  busy: boolean
+  onApprove: () => void
+  onNeedsInfo: (note: string) => void
+  onReject: (note: string | null) => void
+}) {
+  const [action, setAction] = useState<ReviewAction>(null)
+  const [note, setNote] = useState('')
+  const [noteError, setNoteError] = useState<string | null>(null)
+
+  function resetNoteUi() {
+    setAction(null)
+    setNote('')
+    setNoteError(null)
+  }
+
+  function submitNeedsInfo() {
+    const trimmed = note.trim()
+    if (!trimmed) {
+      setNoteError('A note is required — tell them what’s missing.')
+      return
+    }
+    onNeedsInfo(trimmed)
+    resetNoteUi()
+  }
+
+  function submitReject() {
+    onReject(note.trim() || null)
+    resetNoteUi()
+  }
+
+  return (
+    <li className="rounded-[1.35rem] border-[2px] border-dusk bg-paper p-4 shadow-[3px_3px_0_#06181C]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-lagoon">
+        {app.category} · {app.area} ·{' '}
+        {app.verification_status === 'needs_info' ? 'Needs info' : 'Pending'}
+      </p>
+      <p className="mt-1 font-semibold">{app.name}</p>
+      <dl className="mt-3 space-y-1.5 text-sm">
+        <div className="flex gap-2">
+          <dt className="w-16 shrink-0 font-bold text-muted">Phone</dt>
+          <dd className="text-ink">{app.phone}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-16 shrink-0 font-bold text-muted">Hours</dt>
+          <dd className="text-ink">{app.hours?.trim() || '—'}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-16 shrink-0 font-bold text-muted">About</dt>
+          <dd className="whitespace-pre-wrap text-ink-soft">
+            {app.about?.trim() || '—'}
+          </dd>
+        </div>
+      </dl>
+
+      {app.photos.length > 0 ? (
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {app.photos.map((src) => (
+            <a key={src} href={src} target="_blank" rel="noreferrer">
+              <img
+                src={src}
+                alt=""
+                className="h-20 w-20 shrink-0 rounded-lg object-cover ring-1 ring-line"
+              />
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-xs font-semibold text-muted">No photos uploaded yet.</p>
+      )}
+
+      {app.review_note && (
+        <p className="mt-2 rounded-lg bg-mist px-2.5 py-1.5 text-sm text-mango-deep">
+          Last note: {app.review_note}
+        </p>
+      )}
+
+      <p className="mt-2 text-[11px] font-semibold text-muted">
+        Ref · {app.id.slice(0, 8)} · submitted{' '}
+        {new Date(app.submitted_at).toLocaleString()}
+      </p>
+
+      {action === null ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-full bg-lagoon px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+            disabled={busy}
+            onClick={onApprove}
+          >
+            Approve
+          </button>
+          <button
+            type="button"
+            className="rounded-full bg-mist px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+            disabled={busy}
+            onClick={() => {
+              setAction('needs_info')
+              setNote(app.review_note ?? '')
+              setNoteError(null)
+            }}
+          >
+            Needs info
+          </button>
+          <button
+            type="button"
+            className="rounded-full bg-mist px-3 py-1.5 text-xs font-bold text-mango-deep disabled:opacity-50"
+            disabled={busy}
+            onClick={() => {
+              setAction('reject')
+              setNote('')
+              setNoteError(null)
+            }}
+          >
+            Reject
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3 space-y-2 rounded-xl bg-mist/80 p-3">
+          <label className="block text-xs font-bold uppercase tracking-wide text-muted">
+            {action === 'needs_info'
+              ? 'What’s missing? (required)'
+              : 'Rejection note (optional)'}
+          </label>
+          <textarea
+            className="field min-h-[4.5rem] text-sm"
+            value={note}
+            onChange={(e) => {
+              setNote(e.target.value)
+              setNoteError(null)
+            }}
+            placeholder={
+              action === 'needs_info'
+                ? 'e.g. Clearer storefront photo + outdoor sign'
+                : 'Optional note for the vendor'
+            }
+            disabled={busy}
+          />
+          {noteError && (
+            <p className="text-xs font-semibold text-mango-deep">{noteError}</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-full bg-ink px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+              disabled={busy}
+              onClick={() =>
+                action === 'needs_info' ? submitNeedsInfo() : submitReject()
+              }
+            >
+              {busy
+                ? 'Saving…'
+                : action === 'needs_info'
+                  ? 'Send needs info'
+                  : 'Confirm reject'}
+            </button>
+            <button
+              type="button"
+              className="rounded-full bg-paper px-3 py-1.5 text-xs font-bold ring-1 ring-line disabled:opacity-50"
+              disabled={busy}
+              onClick={resetNoteUi}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </li>
+  )
+}
+
 export function AdminVendorsPage() {
   const {
     vendors,
-    pendingVendors,
     saveVendor,
     setVendorActive,
-    setVerification,
     resetCatalog,
   } = useCatalog()
   const navigate = useNavigate()
@@ -89,147 +267,94 @@ export function AdminVendorsPage() {
     navigate(`/admin/vendors/${draft.id}`)
   }
 
-  const cloudPending = cloudApps.filter(
-    (v) =>
-      v.verification_status === 'pending' ||
-      v.verification_status === 'needs_info',
+  const pendingQueue = cloudApps.filter((v) => v.verification_status === 'pending')
+  const needsInfoQueue = cloudApps.filter(
+    (v) => v.verification_status === 'needs_info',
   )
   const cloudLive = cloudApps.filter((v) => v.verification_status === 'approved')
-  const cloudOther = cloudApps.filter(
-    (v) =>
-      v.verification_status !== 'approved' &&
-      v.verification_status !== 'pending' &&
-      v.verification_status !== 'needs_info',
+  const cloudRejected = cloudApps.filter(
+    (v) => v.verification_status === 'rejected',
   )
 
-  const live = vendors.filter((v) => v.verificationStatus === 'approved')
-  const other = vendors.filter(
-    (v) =>
-      v.verificationStatus !== 'approved' &&
-      v.verificationStatus !== 'pending' &&
-      v.verificationStatus !== 'needs_info',
-  )
+  const liveLocal = vendors.filter((v) => v.verificationStatus === 'approved')
 
   return (
     <RequireOps>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-[-0.03em]">
-            Businesses
+            Vendor applications
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Online applications (Supabase) first — then local pilot catalog.
+            Live Supabase queue — same ops session as the order inbox.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="rounded-full bg-mist px-4 py-2 text-sm font-bold"
-            onClick={() => void refreshCloud()}
-            disabled={cloudLoading}
-          >
-            {cloudLoading ? 'Refreshing…' : 'Refresh cloud'}
-          </button>
-          <button type="button" className="btn-primary" onClick={addVendor}>
-            Add local business
-          </button>
-        </div>
+        <button
+          type="button"
+          className="rounded-full bg-mist px-4 py-2 text-sm font-bold"
+          onClick={() => void refreshCloud()}
+          disabled={cloudLoading}
+        >
+          {cloudLoading ? 'Refreshing…' : 'Refresh'}
+        </button>
       </div>
 
       {cloudError && (
         <p className="mt-4 rounded-xl bg-mango/15 px-3 py-2.5 text-sm font-semibold text-mango-deep">
-          Cloud queue: {cloudError}
-          {!cloudError.toLowerCase().includes('ops')
-            ? ''
-            : ' — sign in with an ops account (app_metadata.role = ops).'}
+          {cloudError}
+          {cloudError.toLowerCase().includes('ops') ||
+          cloudError.toLowerCase().includes('policy') ||
+          cloudError.toLowerCase().includes('permission')
+            ? ' — sign in with an ops account (app_metadata.role = ops).'
+            : ''}
         </p>
       )}
 
       <section className="mt-8">
         <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-mango-deep">
-          Cloud applications · awaiting · {cloudPending.length}
+          Pending · {pendingQueue.length}
         </h2>
         {cloudLoading && cloudApps.length === 0 ? (
           <p className="mt-3 text-sm font-semibold text-muted">Loading…</p>
-        ) : cloudPending.length === 0 ? (
+        ) : pendingQueue.length === 0 ? (
           <p className="mt-3 text-sm font-semibold text-muted">
-            No pending online applications.
+            No pending applications.
           </p>
         ) : (
           <ul className="mt-3 space-y-3">
-            {cloudPending.map((v) => (
-              <li
+            {pendingQueue.map((v) => (
+              <CloudApplicationCard
                 key={v.id}
-                className="rounded-[1.35rem] border-[2px] border-dusk bg-paper p-4 shadow-[3px_3px_0_#06181C]"
-              >
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-lagoon">
-                  {v.category} · {v.area} ·{' '}
-                  {v.verification_status === 'needs_info' ? 'Needs info' : 'Pending'}
-                </p>
-                <p className="mt-1 font-semibold">{v.name}</p>
-                <p className="mt-0.5 text-sm text-muted">
-                  {v.phone}
-                  {v.hours ? ` · ${v.hours}` : ''}
-                </p>
-                {v.about && (
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-ink-soft">{v.about}</p>
-                )}
-                {v.photos[0] && (
-                  <div className="mt-3 flex gap-2 overflow-x-auto">
-                    {v.photos.slice(0, 4).map((src) => (
-                      <img
-                        key={src}
-                        src={src}
-                        alt=""
-                        className="h-16 w-16 shrink-0 rounded-lg object-cover ring-1 ring-line"
-                      />
-                    ))}
-                  </div>
-                )}
-                <p className="mt-2 text-[11px] font-semibold text-muted">
-                  Ref · {v.id.slice(0, 8)} · submitted{' '}
-                  {new Date(v.submitted_at).toLocaleString()}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="rounded-full bg-lagoon px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
-                    disabled={cloudBusyId === v.id}
-                    onClick={() => void setCloudVerification(v.id, 'approved')}
-                  >
-                    Approve · go live
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-full bg-mist px-3 py-1.5 text-xs font-bold disabled:opacity-50"
-                    disabled={cloudBusyId === v.id}
-                    onClick={() => {
-                      const note = window.prompt(
-                        'What should they fix?',
-                        'Please add clearer storefront photos.',
-                      )
-                      if (note) void setCloudVerification(v.id, 'needs_info', note)
-                    }}
-                  >
-                    Need more info
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-full bg-mist px-3 py-1.5 text-xs font-bold text-mango-deep disabled:opacity-50"
-                    disabled={cloudBusyId === v.id}
-                    onClick={() => {
-                      const note = window.prompt('Rejection note (optional)')
-                      void setCloudVerification(
-                        v.id,
-                        'rejected',
-                        note || 'Not approved for KampeDrop.',
-                      )
-                    }}
-                  >
-                    Reject
-                  </button>
-                </div>
-              </li>
+                app={v}
+                busy={cloudBusyId === v.id}
+                onApprove={() => void setCloudVerification(v.id, 'approved')}
+                onNeedsInfo={(n) => void setCloudVerification(v.id, 'needs_info', n)}
+                onReject={(n) => void setCloudVerification(v.id, 'rejected', n)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-dusk">
+          Needs info · {needsInfoQueue.length}
+        </h2>
+        {needsInfoQueue.length === 0 ? (
+          <p className="mt-3 text-sm font-semibold text-muted">
+            None waiting on more information.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {needsInfoQueue.map((v) => (
+              <CloudApplicationCard
+                key={v.id}
+                app={v}
+                busy={cloudBusyId === v.id}
+                onApprove={() => void setCloudVerification(v.id, 'approved')}
+                onNeedsInfo={(n) => void setCloudVerification(v.id, 'needs_info', n)}
+                onReject={(n) => void setCloudVerification(v.id, 'rejected', n)}
+              />
             ))}
           </ul>
         )}
@@ -238,7 +363,7 @@ export function AdminVendorsPage() {
       {cloudLive.length > 0 && (
         <section className="mt-10">
           <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-lagoon">
-            Cloud · approved · {cloudLive.length}
+            Approved · live · {cloudLive.length}
           </h2>
           <ul className="mt-3 space-y-3">
             {cloudLive.map((v) => (
@@ -251,26 +376,29 @@ export function AdminVendorsPage() {
                   {!v.active && ' · Inactive'}
                 </p>
                 <p className="mt-1 font-semibold">{v.name}</p>
-                <p className="mt-0.5 text-sm text-muted">{v.phone}</p>
+                <p className="mt-0.5 text-sm text-muted">
+                  {v.phone}
+                  {v.hours ? ` · ${v.hours}` : ''}
+                </p>
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      {cloudOther.length > 0 && (
+      {cloudRejected.length > 0 && (
         <section className="mt-10">
           <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted">
-            Cloud · other · {cloudOther.length}
+            Rejected · {cloudRejected.length}
           </h2>
           <ul className="mt-3 space-y-3">
-            {cloudOther.map((v) => (
+            {cloudRejected.map((v) => (
               <li
                 key={v.id}
                 className="rounded-[1.35rem] bg-paper p-4 ring-1 ring-line"
               >
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
-                  {v.verification_status} · {v.area}
+                  {v.category} · {v.area}
                 </p>
                 <p className="mt-1 font-semibold">{v.name}</p>
                 <p className="mt-0.5 text-sm text-muted">{v.phone}</p>
@@ -283,71 +411,22 @@ export function AdminVendorsPage() {
         </section>
       )}
 
-      {pendingVendors.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted">
-            Local catalog · awaiting · {pendingVendors.length}
-          </h2>
-          <ul className="mt-3 space-y-3">
-            {pendingVendors.map((v) => (
-              <li
-                key={v.id}
-                className="rounded-[1.35rem] border-[2px] border-line bg-paper p-4"
-              >
-                <Link to={`/admin/vendors/${v.id}`} className="block">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-lagoon">
-                    {categoryLabel[v.category]} · {v.area} ·{' '}
-                    {v.verificationStatus === 'needs_info' ? 'Needs info' : 'Pending'}
-                  </p>
-                  <p className="mt-1 font-semibold">{v.name}</p>
-                  <p className="mt-0.5 text-sm text-muted">
-                    {v.pickupSpot} · {v.phone}
-                  </p>
-                </Link>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="rounded-full bg-lagoon px-3 py-1.5 text-xs font-bold text-white"
-                    onClick={() => setVerification(v.id, 'approved')}
-                  >
-                    Approve · go live
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-full bg-mist px-3 py-1.5 text-xs font-bold"
-                    onClick={() => {
-                      const note = window.prompt(
-                        'What should they fix?',
-                        'Please add clearer storefront photos.',
-                      )
-                      if (note) setVerification(v.id, 'needs_info', note)
-                    }}
-                  >
-                    Need more info
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-full bg-mist px-3 py-1.5 text-xs font-bold text-mango-deep"
-                    onClick={() => {
-                      const note = window.prompt('Rejection note (optional)')
-                      setVerification(v.id, 'rejected', note || 'Not approved for KampeDrop.')
-                    }}
-                  >
-                    Reject
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section className="mt-10">
-        <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-lagoon">
-          Local pilot · live · {live.length}
-        </h2>
+      <section className="mt-12 border-t border-line pt-8">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted">
+              Local pilot catalog · {liveLocal.length}
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Seed / device-only businesses (not the Supabase queue).
+            </p>
+          </div>
+          <button type="button" className="btn-primary" onClick={addVendor}>
+            Add local business
+          </button>
+        </div>
         <ul className="mt-3 space-y-3">
-          {live.map((v) => (
+          {liveLocal.map((v) => (
             <li key={v.id}>
               <div className="flex items-center gap-3 rounded-[1.35rem] bg-paper p-4 ring-1 ring-line">
                 <Link to={`/admin/vendors/${v.id}`} className="min-w-0 flex-1">
@@ -371,68 +450,45 @@ export function AdminVendorsPage() {
             </li>
           ))}
         </ul>
-      </section>
 
-      {other.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted">
-            Local · other · {other.length}
-          </h2>
-          <ul className="mt-3 space-y-3">
-            {other.map((v) => (
-              <li key={v.id}>
-                <Link
-                  to={`/admin/vendors/${v.id}`}
-                  className="block rounded-[1.35rem] bg-paper p-4 ring-1 ring-line"
+        <div className="mt-6">
+          {!confirmReset ? (
+            <button
+              type="button"
+              className="text-sm font-semibold text-muted hover:text-ink"
+              onClick={() => setConfirmReset(true)}
+            >
+              Reset local catalog to seed…
+            </button>
+          ) : (
+            <div className="rounded-2xl bg-mist p-4">
+              <p className="text-sm font-semibold">
+                Replaces local businesses with the original pilot list. Supabase
+                applications are not affected.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white"
+                  onClick={() => {
+                    resetCatalog()
+                    setConfirmReset(false)
+                  }}
                 >
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
-                    {v.verificationStatus} · {v.area}
-                  </p>
-                  <p className="mt-1 font-semibold">{v.name}</p>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <div className="mt-10 border-t border-line pt-6">
-        {!confirmReset ? (
-          <button
-            type="button"
-            className="text-sm font-semibold text-muted hover:text-ink"
-            onClick={() => setConfirmReset(true)}
-          >
-            Reset local catalog to seed…
-          </button>
-        ) : (
-          <div className="rounded-2xl bg-mist p-4">
-            <p className="text-sm font-semibold">
-              This replaces all local businesses with the original pilot list. Cloud
-              applications are not affected.
-            </p>
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white"
-                onClick={() => {
-                  resetCatalog()
-                  setConfirmReset(false)
-                }}
-              >
-                Reset
-              </button>
-              <button
-                type="button"
-                className="rounded-xl bg-paper px-4 py-2 text-sm font-bold ring-1 ring-line"
-                onClick={() => setConfirmReset(false)}
-              >
-                Cancel
-              </button>
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl bg-paper px-4 py-2 text-sm font-bold ring-1 ring-line"
+                  onClick={() => setConfirmReset(false)}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </section>
     </RequireOps>
   )
 }

@@ -202,7 +202,10 @@ export async function fetchOpsVendors(): Promise<
   return { ok: true, vendors: (data ?? []) as VendorRow[] }
 }
 
-/** Ops: set verification_status (+ active when approved). */
+/**
+ * Ops: set verification_status (+ active when approved).
+ * Uses authenticated session — RLS ops_update_vendors / is_ops().
+ */
 export async function updateVendorVerification(
   id: string,
   status: Extract<VerificationStatus, 'approved' | 'needs_info' | 'rejected'>,
@@ -219,6 +222,7 @@ export async function updateVendorVerification(
     .update({
       verification_status: status,
       review_note: reviewNote,
+      // Buyer visibility requires approved AND active
       active: status === 'approved',
     })
     .eq('id', id)

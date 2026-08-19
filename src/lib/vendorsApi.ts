@@ -1,4 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from './supabase'
+import type { VerificationStatus } from '../data/vendors'
 
 export type SubmitVendorApplicationInput = {
   name: string
@@ -10,6 +11,24 @@ export type SubmitVendorApplicationInput = {
   pin: string
   lat?: number | null
   lng?: number | null
+}
+
+/** Row shape in public.vendors (snake_case). */
+export type VendorRow = {
+  id: string
+  name: string
+  category: string
+  area: string
+  phone: string
+  hours: string | null
+  about: string | null
+  lat: number | null
+  lng: number | null
+  verification_status: string
+  review_note: string | null
+  active: boolean
+  submitted_at: string
+  created_at: string
 }
 
 /** Convert a canvas data-URL to a Blob for Storage upload. */
@@ -108,4 +127,70 @@ export async function uploadVendorApplicationPhotos(
   }
 
   return { ok: true, paths }
+}
+
+/** Ops: list all vendors (RLS: is_ops). */
+export async function fetchOpsVendors(): Promise<
+  { ok: true; vendors: VendorRow[] } | { ok: false; reason: string }
+> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase
+    .from('vendors')
+    .select(
+      'id, name, category, area, phone, hours, about, lat, lng, verification_status, review_note, active, submitted_at, created_at',
+    )
+    .order('submitted_at', { ascending: false })
+
+  if (error) return { ok: false, reason: error.message }
+  return { ok: true, vendors: (data ?? []) as VendorRow[] }
+}
+
+/** Ops: set verification_status (+ active when approved). */
+export async function updateVendorVerification(
+  id: string,
+  status: Extract<VerificationStatus, 'approved' | 'needs_info' | 'rejected'>,
+  reviewNote: string | null = null,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { error } = await supabase
+    .from('vendors')
+    .update({
+      verification_status: status,
+      review_note: reviewNote,
+      active: status === 'approved',
+    })
+    .eq('id', id)
+
+  if (error) return { ok: false, reason: error.message }
+  return { ok: true }
+}
+
+/** Public URLs for applications/{vendorId}/* photos. */
+export async function listVendorApplicationPhotoUrls(
+  vendorId: string,
+): Promise<string[]> {
+  const supabase = getSupabase()
+  if (!supabase) return []
+
+  const folder = `applications/${vendorId}`
+  const { data, error } = await supabase.storage.from('vendor-photos').list(folder)
+  if (error || !data?.length) return []
+
+  return data
+    .filter((f) => f.name && !f.name.endsWith('/'))
+    .map(
+      (f) =>
+        supabase.storage.from('vendor-photos').getPublicUrl(`${folder}/${f.name}`).data
+          .publicUrl,
+    )
 }

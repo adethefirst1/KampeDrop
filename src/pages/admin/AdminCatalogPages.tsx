@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   createMenuItem,
@@ -13,7 +13,15 @@ import {
   type MenuItem,
   type Vendor,
 } from '../../data/vendors'
+import {
+  fetchOpsVendors,
+  listVendorApplicationPhotoUrls,
+  updateVendorVerification,
+  type VendorRow,
+} from '../../lib/vendorsApi'
 import { RequireOps } from './AdminShell'
+
+type CloudApp = VendorRow & { photos: string[] }
 
 export function AdminVendorsPage() {
   const {
@@ -26,6 +34,49 @@ export function AdminVendorsPage() {
   } = useCatalog()
   const navigate = useNavigate()
   const [confirmReset, setConfirmReset] = useState(false)
+  const [cloudApps, setCloudApps] = useState<CloudApp[]>([])
+  const [cloudLoading, setCloudLoading] = useState(true)
+  const [cloudError, setCloudError] = useState<string | null>(null)
+  const [cloudBusyId, setCloudBusyId] = useState<string | null>(null)
+
+  const refreshCloud = useCallback(async () => {
+    setCloudLoading(true)
+    setCloudError(null)
+    const result = await fetchOpsVendors()
+    if (!result.ok) {
+      setCloudError(result.reason)
+      setCloudApps([])
+      setCloudLoading(false)
+      return
+    }
+    const withPhotos = await Promise.all(
+      result.vendors.map(async (row) => ({
+        ...row,
+        photos: await listVendorApplicationPhotoUrls(row.id),
+      })),
+    )
+    setCloudApps(withPhotos)
+    setCloudLoading(false)
+  }, [])
+
+  useEffect(() => {
+    void refreshCloud()
+  }, [refreshCloud])
+
+  async function setCloudVerification(
+    id: string,
+    status: 'approved' | 'needs_info' | 'rejected',
+    reviewNote: string | null = null,
+  ) {
+    setCloudBusyId(id)
+    const result = await updateVendorVerification(id, status, reviewNote)
+    setCloudBusyId(null)
+    if (!result.ok) {
+      window.alert(result.reason)
+      return
+    }
+    await refreshCloud()
+  }
 
   function addVendor() {
     const draft = createVendor('New business')
@@ -37,6 +88,19 @@ export function AdminVendorsPage() {
     saveVendor(draft)
     navigate(`/admin/vendors/${draft.id}`)
   }
+
+  const cloudPending = cloudApps.filter(
+    (v) =>
+      v.verification_status === 'pending' ||
+      v.verification_status === 'needs_info',
+  )
+  const cloudLive = cloudApps.filter((v) => v.verification_status === 'approved')
+  const cloudOther = cloudApps.filter(
+    (v) =>
+      v.verification_status !== 'approved' &&
+      v.verification_status !== 'pending' &&
+      v.verification_status !== 'needs_info',
+  )
 
   const live = vendors.filter((v) => v.verificationStatus === 'approved')
   const other = vendors.filter(
@@ -54,24 +118,181 @@ export function AdminVendorsPage() {
             Businesses
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Approve new applications before they appear to buyers.
+            Online applications (Supabase) first — then local pilot catalog.
           </p>
         </div>
-        <button type="button" className="btn-primary" onClick={addVendor}>
-          Add business
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-full bg-mist px-4 py-2 text-sm font-bold"
+            onClick={() => void refreshCloud()}
+            disabled={cloudLoading}
+          >
+            {cloudLoading ? 'Refreshing…' : 'Refresh cloud'}
+          </button>
+          <button type="button" className="btn-primary" onClick={addVendor}>
+            Add local business
+          </button>
+        </div>
       </div>
 
+      {cloudError && (
+        <p className="mt-4 rounded-xl bg-mango/15 px-3 py-2.5 text-sm font-semibold text-mango-deep">
+          Cloud queue: {cloudError}
+          {!cloudError.toLowerCase().includes('ops')
+            ? ''
+            : ' — sign in with an ops account (app_metadata.role = ops).'}
+        </p>
+      )}
+
+      <section className="mt-8">
+        <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-mango-deep">
+          Cloud applications · awaiting · {cloudPending.length}
+        </h2>
+        {cloudLoading && cloudApps.length === 0 ? (
+          <p className="mt-3 text-sm font-semibold text-muted">Loading…</p>
+        ) : cloudPending.length === 0 ? (
+          <p className="mt-3 text-sm font-semibold text-muted">
+            No pending online applications.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {cloudPending.map((v) => (
+              <li
+                key={v.id}
+                className="rounded-[1.35rem] border-[2px] border-dusk bg-paper p-4 shadow-[3px_3px_0_#06181C]"
+              >
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-lagoon">
+                  {v.category} · {v.area} ·{' '}
+                  {v.verification_status === 'needs_info' ? 'Needs info' : 'Pending'}
+                </p>
+                <p className="mt-1 font-semibold">{v.name}</p>
+                <p className="mt-0.5 text-sm text-muted">
+                  {v.phone}
+                  {v.hours ? ` · ${v.hours}` : ''}
+                </p>
+                {v.about && (
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-ink-soft">{v.about}</p>
+                )}
+                {v.photos[0] && (
+                  <div className="mt-3 flex gap-2 overflow-x-auto">
+                    {v.photos.slice(0, 4).map((src) => (
+                      <img
+                        key={src}
+                        src={src}
+                        alt=""
+                        className="h-16 w-16 shrink-0 rounded-lg object-cover ring-1 ring-line"
+                      />
+                    ))}
+                  </div>
+                )}
+                <p className="mt-2 text-[11px] font-semibold text-muted">
+                  Ref · {v.id.slice(0, 8)} · submitted{' '}
+                  {new Date(v.submitted_at).toLocaleString()}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded-full bg-lagoon px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+                    disabled={cloudBusyId === v.id}
+                    onClick={() => void setCloudVerification(v.id, 'approved')}
+                  >
+                    Approve · go live
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full bg-mist px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+                    disabled={cloudBusyId === v.id}
+                    onClick={() => {
+                      const note = window.prompt(
+                        'What should they fix?',
+                        'Please add clearer storefront photos.',
+                      )
+                      if (note) void setCloudVerification(v.id, 'needs_info', note)
+                    }}
+                  >
+                    Need more info
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full bg-mist px-3 py-1.5 text-xs font-bold text-mango-deep disabled:opacity-50"
+                    disabled={cloudBusyId === v.id}
+                    onClick={() => {
+                      const note = window.prompt('Rejection note (optional)')
+                      void setCloudVerification(
+                        v.id,
+                        'rejected',
+                        note || 'Not approved for KampeDrop.',
+                      )
+                    }}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {cloudLive.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-lagoon">
+            Cloud · approved · {cloudLive.length}
+          </h2>
+          <ul className="mt-3 space-y-3">
+            {cloudLive.map((v) => (
+              <li
+                key={v.id}
+                className="rounded-[1.35rem] bg-paper p-4 ring-1 ring-line"
+              >
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-lagoon">
+                  {v.category} · {v.area}
+                  {!v.active && ' · Inactive'}
+                </p>
+                <p className="mt-1 font-semibold">{v.name}</p>
+                <p className="mt-0.5 text-sm text-muted">{v.phone}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {cloudOther.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted">
+            Cloud · other · {cloudOther.length}
+          </h2>
+          <ul className="mt-3 space-y-3">
+            {cloudOther.map((v) => (
+              <li
+                key={v.id}
+                className="rounded-[1.35rem] bg-paper p-4 ring-1 ring-line"
+              >
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+                  {v.verification_status} · {v.area}
+                </p>
+                <p className="mt-1 font-semibold">{v.name}</p>
+                <p className="mt-0.5 text-sm text-muted">{v.phone}</p>
+                {v.review_note && (
+                  <p className="mt-1 text-sm text-mango-deep">{v.review_note}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {pendingVendors.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-mango-deep">
-            Awaiting verification · {pendingVendors.length}
+        <section className="mt-10">
+          <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted">
+            Local catalog · awaiting · {pendingVendors.length}
           </h2>
           <ul className="mt-3 space-y-3">
             {pendingVendors.map((v) => (
               <li
                 key={v.id}
-                className="rounded-[1.35rem] border-[2px] border-dusk bg-paper p-4 shadow-[3px_3px_0_#06181C]"
+                className="rounded-[1.35rem] border-[2px] border-line bg-paper p-4"
               >
                 <Link to={`/admin/vendors/${v.id}`} className="block">
                   <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-lagoon">
@@ -82,18 +303,6 @@ export function AdminVendorsPage() {
                   <p className="mt-0.5 text-sm text-muted">
                     {v.pickupSpot} · {v.phone}
                   </p>
-                  {v.photos[0] && (
-                    <div className="mt-3 flex gap-2 overflow-x-auto">
-                      {v.photos.slice(0, 4).map((src) => (
-                        <img
-                          key={src.slice(0, 24)}
-                          src={src}
-                          alt=""
-                          className="h-16 w-16 shrink-0 rounded-lg object-cover ring-1 ring-line"
-                        />
-                      ))}
-                    </div>
-                  )}
                 </Link>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
@@ -135,7 +344,7 @@ export function AdminVendorsPage() {
 
       <section className="mt-10">
         <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-lagoon">
-          Live on buyer app · {live.length}
+          Local pilot · live · {live.length}
         </h2>
         <ul className="mt-3 space-y-3">
           {live.map((v) => (
@@ -167,7 +376,7 @@ export function AdminVendorsPage() {
       {other.length > 0 && (
         <section className="mt-10">
           <h2 className="text-xs font-extrabold uppercase tracking-[0.16em] text-muted">
-            Other · {other.length}
+            Local · other · {other.length}
           </h2>
           <ul className="mt-3 space-y-3">
             {other.map((v) => (
@@ -194,12 +403,13 @@ export function AdminVendorsPage() {
             className="text-sm font-semibold text-muted hover:text-ink"
             onClick={() => setConfirmReset(true)}
           >
-            Reset catalog to seed…
+            Reset local catalog to seed…
           </button>
         ) : (
           <div className="rounded-2xl bg-mist p-4">
             <p className="text-sm font-semibold">
-              This replaces all businesses with the original pilot list.
+              This replaces all local businesses with the original pilot list. Cloud
+              applications are not affected.
             </p>
             <div className="mt-3 flex gap-2">
               <button

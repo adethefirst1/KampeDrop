@@ -9,8 +9,11 @@ type Props = {
   }
   /** Phone on the order — used to resume Paystack if checkout email isn’t cached */
   phone?: string
-  /** True while we know user just returned from Paystack / verify in flight */
-  confirming?: boolean
+  /**
+   * User just returned from Paystack success — treat as paid in the UI.
+   * Server verify still runs in the background on Track.
+   */
+  justPaid?: boolean
   onRetryRefresh?: () => void
   /** Opens the playful keepsake receipt after payment */
   onViewReceipt?: () => void
@@ -36,6 +39,22 @@ export function rememberPayEmail(orderId: string, email: string) {
   }
 }
 
+export function markOrderPaidLocally(orderId: string) {
+  try {
+    sessionStorage.setItem(`kampedrop-paid-${orderId}`, '1')
+  } catch {
+    /* ignore */
+  }
+}
+
+export function wasOrderPaidLocally(orderId: string): boolean {
+  try {
+    return sessionStorage.getItem(`kampedrop-paid-${orderId}`) === '1'
+  } catch {
+    return false
+  }
+}
+
 function resolvePayEmail(orderId: string, phone?: string): string | null {
   try {
     const cached = sessionStorage.getItem(payEmailStorageKey(orderId))?.trim()
@@ -48,14 +67,51 @@ function resolvePayEmail(orderId: string, phone?: string): string | null {
   return null
 }
 
+function PaidStrip({
+  isTransfer,
+  total,
+  onViewReceipt,
+}: {
+  isTransfer: boolean
+  total: number
+  onViewReceipt?: () => void
+}) {
+  return (
+    <div className="mt-4 rounded-2xl bg-lagoon/10 px-4 py-3 ring-1 ring-lagoon/25">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-lagoon">
+            Payment received
+          </p>
+          <p className="mt-1 text-sm font-semibold text-ink">
+            {isTransfer ? 'Bank transfer' : 'Card'} · {formatNaira(total)}
+          </p>
+          <p className="mt-0.5 text-xs text-muted">
+            Held until handoff passkey — vendor isn’t paid yet.
+          </p>
+        </div>
+        {onViewReceipt && (
+          <button
+            type="button"
+            onClick={onViewReceipt}
+            className="shrink-0 rounded-full bg-paper px-2.5 py-1 text-[11px] font-bold text-lagoon ring-1 ring-lagoon/25 transition hover:bg-white"
+          >
+            View receipt
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /**
  * Track payment strip — status first, not a second checkout form.
- * Modes: confirming | paid | failed | unpaid
+ * Return from Paystack = payment made → paid strip + receipt (not “confirming”).
  */
 export function PaystackPayPanel({
   order,
   phone,
-  confirming = false,
+  justPaid = false,
   onRetryRefresh,
   onViewReceipt,
 }: Props) {
@@ -66,51 +122,17 @@ export function PaystackPayPanel({
   const [error, setError] = useState<string | null>(null)
 
   const isTransfer = order.payment === 'transfer'
-  const paid = isPaidState(state)
-  const failed = state === 'card_failed'
+  const paid =
+    isPaidState(state) || justPaid || wasOrderPaidLocally(order.id)
+  const failed = state === 'card_failed' && !paid
 
   if (paid) {
     return (
-      <div className="mt-4 rounded-2xl bg-lagoon/10 px-4 py-3 ring-1 ring-lagoon/25">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-lagoon">
-              Payment received
-            </p>
-            <p className="mt-1 text-sm font-semibold text-ink">
-              {isTransfer ? 'Bank transfer' : 'Card'} · {formatNaira(order.total)}
-            </p>
-            <p className="mt-0.5 text-xs text-muted">
-              Held until handoff passkey — vendor isn’t paid yet.
-            </p>
-          </div>
-          {onViewReceipt && (
-            <button
-              type="button"
-              onClick={onViewReceipt}
-              className="shrink-0 rounded-full bg-paper px-2.5 py-1 text-[11px] font-bold text-lagoon ring-1 ring-lagoon/25 transition hover:bg-white"
-            >
-              View receipt
-            </button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  if (confirming) {
-    return (
-      <div className="mt-4 rounded-2xl bg-mist px-4 py-4 ring-1 ring-line">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-lagoon">
-          Confirming payment
-        </p>
-        <p className="mt-1.5 text-sm font-semibold text-ink">
-          Checking Paystack for {formatNaira(order.total)}…
-        </p>
-        <p className="mt-1 text-xs text-muted">
-          This usually takes a few seconds. You don’t need to pay again.
-        </p>
-      </div>
+      <PaidStrip
+        isTransfer={isTransfer}
+        total={order.total}
+        onViewReceipt={onViewReceipt}
+      />
     )
   }
 

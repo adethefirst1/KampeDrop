@@ -3,7 +3,7 @@ import { appPath } from '../paths'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { OrderLayout, GuaranteePill } from '../components/layout'
-import { PaystackPayPanel } from '../components/PaystackPayPanel'
+import { PaystackPayPanel, markOrderPaidLocally, wasOrderPaidLocally } from '../components/PaystackPayPanel'
 import { OrderReceiptSheet } from '../components/OrderReceipt'
 import { HelpGuaranteePanel } from '../components/HelpGuaranteePanel'
 import { AnimatedCheck, SecureSeal } from '../components/motion'
@@ -64,14 +64,23 @@ export function TrackPage() {
   const [cloudOrder, setCloudOrder] = useState<CloudOrder | null>(null)
   const [cloudLoading, setCloudLoading] = useState(Boolean(orderId))
   const [cloudTried, setCloudTried] = useState(false)
-  const [confirmingPayment, setConfirmingPayment] = useState(false)
   const [receiptOpen, setReceiptOpen] = useState(false)
+  const [justPaid, setJustPaid] = useState(false)
   const verifyStarted = useRef(false)
 
   const paystackRef =
     searchParams.get('reference')?.trim() ||
     searchParams.get('trxref')?.trim() ||
     ''
+
+  // Landing from Paystack success = payment made. Show paid + receipt immediately.
+  useEffect(() => {
+    if (!orderId) return
+    if (paystackRef || wasOrderPaidLocally(orderId)) {
+      markOrderPaidLocally(orderId)
+      setJustPaid(true)
+    }
+  }, [orderId, paystackRef])
 
   const opsOrder = orderId ? getOpsOrder(orderId) : undefined
   const stored = useMemo(() => {
@@ -159,8 +168,11 @@ export function TrackPage() {
 
     async function confirm(reference?: string, force = false) {
       if (!force && verifyStarted.current && !reference) return
-      if (reference) verifyStarted.current = true
-      setConfirmingPayment(true)
+      if (reference) {
+        verifyStarted.current = true
+        markOrderPaidLocally(orderId!)
+        setJustPaid(true)
+      }
 
       const verified = await verifyPaystackPayment({
         orderId: orderId!,
@@ -182,12 +194,29 @@ export function TrackPage() {
             paymentState:
               verified.paymentState as CloudOrder['paymentState'],
           })
+        } else if (verified.ok && verified.paid) {
+          setCloudOrder(refreshed.order)
+        } else if (reference) {
+          // Still show paid UI; sync when webhook/verify catches up
+          const paidState =
+            refreshed.order.payment === 'transfer'
+              ? 'transfer_confirmed'
+              : 'card_paid'
+          setCloudOrder({
+            ...refreshed.order,
+            paymentState: isPaystackPaid(refreshed.order.paymentState)
+              ? refreshed.order.paymentState
+              : (paidState as CloudOrder['paymentState']),
+          })
         } else {
           setCloudOrder(refreshed.order)
         }
       }
 
-      setConfirmingPayment(false)
+      if (verified.ok && verified.paid) {
+        markOrderPaidLocally(orderId!)
+        setJustPaid(true)
+      }
 
       if (reference) {
         setSearchParams(
@@ -245,7 +274,8 @@ export function TrackPage() {
               : prev,
           )
         }
-        setConfirmingPayment(false)
+        markOrderPaidLocally(orderId!)
+        setJustPaid(true)
         return
       }
       const refreshed = await fetchOrderById(orderId!)
@@ -264,13 +294,6 @@ export function TrackPage() {
       window.clearInterval(timer)
     }
   }, [orderId, cloudOrder?.payment, cloudOrder?.paymentState])
-
-  useEffect(() => {
-    if (!confirmingPayment) return
-    if (isPaystackPaid(cloudOrder?.paymentState)) {
-      setConfirmingPayment(false)
-    }
-  }, [confirmingPayment, cloudOrder?.paymentState])
 
   const localFallback: PlacedOrder | null = useMemo(() => {
     if (!orderId) return null
@@ -578,7 +601,7 @@ export function TrackPage() {
             payment: order.payment,
             paymentState: paymentState ?? (order.payment === 'card' ? 'card_pending' : 'transfer_pending'),
           }}
-          confirming={confirmingPayment || Boolean(paystackRef)}
+          justPaid={justPaid || Boolean(paystackRef)}
           phone={order.phone}
           onViewReceipt={() => setReceiptOpen(true)}
           onRetryRefresh={() => {

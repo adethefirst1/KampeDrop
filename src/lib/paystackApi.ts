@@ -39,6 +39,7 @@ export async function initializePaystackPayment(input: {
     body: JSON.stringify({
       order_id: input.orderId,
       email: input.email.trim(),
+      callback_origin: window.location.origin,
     }),
   })
 

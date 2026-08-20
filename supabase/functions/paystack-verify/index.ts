@@ -124,11 +124,13 @@ Deno.serve(async (req) => {
   }
 
   const expectedKobo = Math.round(Number(order.total) * 100)
-  if (typeof data.amount === 'number' && data.amount !== expectedKobo) {
+  const paidKobo =
+    typeof data.amount === 'number' ? Math.round(data.amount) : null
+  if (paidKobo != null && paidKobo !== expectedKobo) {
     console.error('verify amount mismatch', {
       order: order.id,
       expectedKobo,
-      got: data.amount,
+      got: paidKobo,
     })
     return jsonResponse({
       paid: false,

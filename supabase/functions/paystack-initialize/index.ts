@@ -7,6 +7,39 @@ const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY') ?? ''
 type InitBody = {
   order_id?: string
   email?: string
+  /** Browser origin so local/dev return to the same host after Paystack */
+  callback_origin?: string
+}
+
+function resolveCallbackOrigin(raw: string | undefined): string {
+  const fallback = APP_ORIGIN.replace(/\/$/, '')
+  const origin = raw?.trim().replace(/\/$/, '')
+  if (!origin) return fallback
+
+  const allowed = new Set([
+    fallback,
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
+    'http://127.0.0.1:5175',
+  ])
+  try {
+    const u = new URL(origin)
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return fallback
+    if (allowed.has(origin)) return origin
+    // Allow any localhost / 127.0.0.1 port for Vite
+    if (
+      (u.hostname === 'localhost' || u.hostname === '127.0.0.1') &&
+      (u.protocol === 'http:' || u.protocol === 'https:')
+    ) {
+      return origin
+    }
+  } catch {
+    return fallback
+  }
+  return fallback
 }
 
 Deno.serve(async (req) => {
@@ -104,7 +137,8 @@ Deno.serve(async (req) => {
   // Unique reference per attempt so failed retries can re-initialize
   const reference = `${order.id}-${Date.now().toString(36)}`
 
-  const callbackUrl = `${APP_ORIGIN}/app/orders/${encodeURIComponent(order.id)}`
+  const callbackBase = resolveCallbackOrigin(body.callback_origin)
+  const callbackUrl = `${callbackBase}/app/orders/${encodeURIComponent(order.id)}`
 
   const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
     method: 'POST',

@@ -7,36 +7,69 @@ type Props = {
   order: Pick<OpsOrder, 'id' | 'total' | 'paymentState'> & {
     payment: 'card' | 'transfer'
   }
+  /** True while we know user just returned from Paystack / verify in flight */
+  confirming?: boolean
   emailHint?: string
-  onPaidRefresh?: () => void
+  onRetryRefresh?: () => void
+}
+
+function isPaidState(state: string | undefined): boolean {
+  return (
+    state === 'card_paid' ||
+    state === 'transfer_confirmed' ||
+    state === 'released'
+  )
 }
 
 /**
- * Paystack hosted checkout for card or bank_transfer (virtual account).
- * Replaces the old static-account TransferPayPanel for transfer orders.
+ * Track payment strip — status first, not a second checkout form.
+ * Modes: confirming | paid | failed | unpaid
  */
 export function PaystackPayPanel({
   order,
+  confirming = false,
   emailHint = '',
-  onPaidRefresh,
+  onRetryRefresh,
 }: Props) {
-  const state = order.paymentState ?? (order.payment === 'card' ? 'card_pending' : 'transfer_pending')
+  const state =
+    order.paymentState ??
+    (order.payment === 'card' ? 'card_pending' : 'transfer_pending')
   const [email, setEmail] = useState(emailHint)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const isTransfer = order.payment === 'transfer'
-  const paid =
-    state === 'card_paid' ||
-    state === 'transfer_confirmed' ||
-    state === 'released'
+  const paid = isPaidState(state)
   const failed = state === 'card_failed'
 
   if (paid) {
     return (
-      <div className="mt-4 rounded-2xl border border-lagoon/30 bg-lagoon/10 px-4 py-3 text-sm font-semibold text-lagoon">
-        {isTransfer ? 'Bank transfer received' : 'Card payment received'} ·{' '}
-        {formatNaira(order.total)}. Escrow releases at handoff passkey.
+      <div className="mt-4 rounded-2xl bg-lagoon/10 px-4 py-3 ring-1 ring-lagoon/25">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-lagoon">
+          Payment received
+        </p>
+        <p className="mt-1 text-sm font-semibold text-ink">
+          {isTransfer ? 'Bank transfer' : 'Card'} · {formatNaira(order.total)}
+        </p>
+        <p className="mt-0.5 text-xs text-muted">
+          Held until handoff passkey — vendor isn’t paid yet.
+        </p>
+      </div>
+    )
+  }
+
+  if (confirming) {
+    return (
+      <div className="mt-4 rounded-2xl bg-mist px-4 py-4 ring-1 ring-line">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-lagoon">
+          Confirming payment
+        </p>
+        <p className="mt-1.5 text-sm font-semibold text-ink">
+          Checking Paystack for {formatNaira(order.total)}…
+        </p>
+        <p className="mt-1 text-xs text-muted">
+          This usually takes a few seconds. You don’t need to pay again.
+        </p>
       </div>
     )
   }
@@ -61,19 +94,19 @@ export function PaystackPayPanel({
   }
 
   return (
-    <div className="mt-4 rounded-2xl border-[2px] border-dusk bg-paper p-4">
-      <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-lagoon">
-        {isTransfer ? 'Bank transfer (Paystack)' : 'Card payment'}
+    <div className="mt-4 rounded-2xl bg-paper px-4 py-4 ring-1 ring-line">
+      <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted">
+        {isTransfer ? 'Bank transfer' : 'Card payment'}
       </p>
       {failed ? (
-        <p className="mt-2 text-sm font-semibold text-mango-deep">
-          Payment didn’t go through. Try again below.
+        <p className="mt-1.5 text-sm font-semibold text-mango-deep">
+          Payment didn’t go through. You can try once more.
         </p>
       ) : (
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-1.5 text-sm text-muted">
           {isTransfer
-            ? `Paystack will show a one-time account for exactly ${formatNaira(order.total)}. This page updates when the transfer lands.`
-            : `Complete Paystack checkout for ${formatNaira(order.total)}. This page updates when payment succeeds.`}
+            ? `Pay exactly ${formatNaira(order.total)} via a Paystack account.`
+            : `Complete card payment for ${formatNaira(order.total)}.`}
         </p>
       )}
 
@@ -105,17 +138,17 @@ export function PaystackPayPanel({
         {busy
           ? 'Opening Paystack…'
           : isTransfer
-            ? 'Get bank details'
-            : 'Pay with card'}
+            ? 'Continue to bank transfer'
+            : 'Continue to card payment'}
       </button>
 
-      {onPaidRefresh && (
+      {onRetryRefresh && (
         <button
           type="button"
-          className="mt-2 w-full text-center text-xs font-bold text-lagoon"
-          onClick={onPaidRefresh}
+          className="mt-2 w-full text-center text-xs font-semibold text-muted hover:text-ink"
+          onClick={onRetryRefresh}
         >
-          I’ve paid — refresh status
+          Refresh status
         </button>
       )}
     </div>

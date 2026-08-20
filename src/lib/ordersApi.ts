@@ -107,13 +107,21 @@ export type CloudOrder = PlacedOrder & {
   riderId: string | null
 }
 
+function paymentStateFallback(
+  payment: PlacedOrder['payment'],
+): OpsOrder['paymentState'] {
+  if (payment === 'cod') return 'cod'
+  if (payment === 'card') return 'card_pending'
+  return 'transfer_pending'
+}
+
 export function rowToCloudOrder(row: OrderRow): CloudOrder {
   const placed = rowToPlacedOrder(row)
   return {
     ...placed,
     paymentState:
       (row.payment_state as OpsOrder['paymentState']) ||
-      (placed.payment === 'cod' ? 'cod' : 'transfer_pending'),
+      paymentStateFallback(placed.payment),
     hasProblem: Boolean(row.has_problem),
     riderId: row.rider_id,
   }
@@ -206,7 +214,7 @@ export function rowToOpsOrder(row: OrderRow): OpsOrder {
     vendorConfirmed: Boolean(row.vendor_confirmed),
     riderId: row.rider_id,
     paymentState: (row.payment_state as OpsOrder['paymentState']) ||
-      (placed.payment === 'cod' ? 'cod' : 'transfer_pending'),
+      paymentStateFallback(placed.payment),
     problemReason: row.problem_reason,
     hasProblem: Boolean(row.has_problem),
     notes: [],

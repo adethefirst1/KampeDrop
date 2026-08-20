@@ -1,7 +1,7 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { appPath } from '../paths'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { OrderLayout, GuaranteePill } from '../components/layout'
 import { PaystackPayPanel } from '../components/PaystackPayPanel'
 import { HelpGuaranteePanel } from '../components/HelpGuaranteePanel'
@@ -24,13 +24,34 @@ import {
   furtherStatus,
 } from '../data/ops'
 import { fetchOrderById, type CloudOrder } from '../lib/ordersApi'
+import { verifyPaystackPayment } from '../lib/paystackApi'
 import { formatNaira } from '../data/vendors'
 import { easeOut, springSnap } from '../motion/tokens'
 
 const TRACK_POLL_MS = 4000
+const TRACK_POLL_FAST_MS = 2000
+
+function isPaystackPaid(state: string | undefined): boolean {
+  return (
+    state === 'card_paid' ||
+    state === 'transfer_confirmed' ||
+    state === 'released'
+  )
+}
+
+function isPaystackPending(state: string | undefined): boolean {
+  return (
+    state === 'card_pending' ||
+    state === 'transfer_pending' ||
+    state === 'transfer_seen' ||
+    state === 'card_failed' ||
+    !state
+  )
+}
 
 export function TrackPage() {
   const { orderId } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { lastOrder } = useCart()
   const { getVendor } = useCatalog()
   const { getOrder: getOpsOrder, cancelOrder, flagProblem } =
@@ -42,6 +63,13 @@ export function TrackPage() {
   const [cloudOrder, setCloudOrder] = useState<CloudOrder | null>(null)
   const [cloudLoading, setCloudLoading] = useState(Boolean(orderId))
   const [cloudTried, setCloudTried] = useState(false)
+  const [confirmingPayment, setConfirmingPayment] = useState(false)
+  const verifyStarted = useRef(false)
+
+  const paystackRef =
+    searchParams.get('reference')?.trim() ||
+    searchParams.get('trxref')?.trim() ||
+    ''
 
   const opsOrder = orderId ? getOpsOrder(orderId) : undefined
   const stored = useMemo(() => {
@@ -93,21 +121,21 @@ export function TrackPage() {
       }
     }
 
-    function startPolling() {
+    function startPolling(ms: number) {
       if (timer != null) window.clearInterval(timer)
       timer = window.setInterval(() => {
         if (document.visibilityState === 'visible') void pull()
-      }, TRACK_POLL_MS)
+      }, ms)
     }
 
     function onVisible() {
       if (document.visibilityState !== 'visible') return
       void pull()
-      startPolling()
+      startPolling(TRACK_POLL_MS)
     }
 
     void pull()
-    startPolling()
+    startPolling(TRACK_POLL_MS)
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('focus', onVisible)
 
@@ -118,6 +146,89 @@ export function TrackPage() {
       window.removeEventListener('focus', onVisible)
     }
   }, [orderId])
+
+  // After Paystack redirect (?reference= / ?trxref=), verify server-side once.
+  useEffect(() => {
+    if (!orderId || !paystackRef || verifyStarted.current) return
+    verifyStarted.current = true
+    setConfirmingPayment(true)
+
+    let cancelled = false
+
+    async function confirm() {
+      const verified = await verifyPaystackPayment({
+        orderId: orderId!,
+        reference: paystackRef,
+      })
+      if (cancelled) return
+
+      const refreshed = await fetchOrderById(orderId!)
+      if (cancelled) return
+      if (refreshed.ok) {
+        if (
+          verified.ok &&
+          verified.paid &&
+          !isPaystackPaid(refreshed.order.paymentState) &&
+          verified.paymentState
+        ) {
+          setCloudOrder({
+            ...refreshed.order,
+            paymentState:
+              verified.paymentState as CloudOrder['paymentState'],
+          })
+        } else {
+          setCloudOrder(refreshed.order)
+        }
+      }
+
+      setConfirmingPayment(false)
+
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('reference')
+          next.delete('trxref')
+          return next
+        },
+        { replace: true },
+      )
+    }
+
+    void confirm()
+    return () => {
+      cancelled = true
+    }
+  }, [orderId, paystackRef, setSearchParams])
+
+  useEffect(() => {
+    if (!confirmingPayment) return
+    if (isPaystackPaid(cloudOrder?.paymentState)) {
+      setConfirmingPayment(false)
+    }
+  }, [confirmingPayment, cloudOrder?.paymentState])
+
+  // Faster poll while card/transfer is still pending.
+  useEffect(() => {
+    if (!orderId) return
+    const payment = cloudOrder?.payment
+    const state = cloudOrder?.paymentState
+    if (
+      !(payment === 'card' || payment === 'transfer') ||
+      !isPaystackPending(state) ||
+      isPaystackPaid(state)
+    ) {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void fetchOrderById(orderId).then((result) => {
+        if (result.ok) setCloudOrder(result.order)
+      })
+    }, TRACK_POLL_FAST_MS)
+
+    return () => window.clearInterval(timer)
+  }, [orderId, cloudOrder?.payment, cloudOrder?.paymentState])
 
   const localFallback: PlacedOrder | null = useMemo(() => {
     if (!orderId) return null
@@ -425,7 +536,8 @@ export function TrackPage() {
             payment: order.payment,
             paymentState: paymentState ?? (order.payment === 'card' ? 'card_pending' : 'transfer_pending'),
           }}
-          onPaidRefresh={() => {
+          confirming={confirmingPayment || Boolean(paystackRef)}
+          onRetryRefresh={() => {
             void fetchOrderById(order.id).then((result) => {
               if (result.ok) setCloudOrder(result.order)
             })

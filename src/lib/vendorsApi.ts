@@ -89,11 +89,12 @@ export type VendorLoginResult = {
   name: string
   verification_status: string
   active: boolean
+  access_token: string
 }
 
 /**
  * Live vendor board sign-in via SECURITY DEFINER RPC.
- * Never receives pin_hash — only id, name, verification_status, active.
+ * Returns access_token (portal credential) — never pin_hash.
  */
 export async function vendorLogin(
   phone: string,
@@ -125,6 +126,15 @@ export async function vendorLogin(
   }
 
   const r = row as Record<string, unknown>
+  const accessToken = r.access_token != null ? String(r.access_token) : ''
+  if (!accessToken) {
+    return {
+      ok: false,
+      reason:
+        'Sign-in succeeded but no access token was returned. Run the vendor portal migration.',
+    }
+  }
+
   return {
     ok: true,
     vendor: {
@@ -132,8 +142,139 @@ export async function vendorLogin(
       name: String(r.name ?? ''),
       verification_status: String(r.verification_status ?? ''),
       active: Boolean(r.active),
+      access_token: accessToken,
     },
   }
+}
+
+export type VendorPortalOrder = {
+  id: string
+  createdAt: string
+  customerName: string
+  phone: string
+  address: string
+  note: string
+  payment: 'cod' | 'transfer'
+  fulfillment: 'delivery' | 'pickup'
+  status: string
+  passkey: string
+  escrowState: string
+  deliveryFee: number
+  subtotal: number
+  total: number
+  lines: import('../context/CartContext').PlacedOrder['lines']
+  vendorId: string
+  vendorConfirmed: boolean
+  kitchenReady: boolean
+  cancelledAt: string | null
+  cancelReason: string | null
+}
+
+function rowToVendorPortalOrder(row: Record<string, unknown>): VendorPortalOrder {
+  const fulfillment = row.fulfillment === 'pickup' ? 'pickup' : 'delivery'
+  const status = String(row.status ?? '')
+  return {
+    id: String(row.id),
+    createdAt: String(row.created_at ?? ''),
+    customerName: String(row.customer_name ?? ''),
+    phone: String(row.phone ?? ''),
+    address: String(row.address ?? ''),
+    note: String(row.note ?? ''),
+    payment: row.payment === 'transfer' ? 'transfer' : 'cod',
+    fulfillment,
+    status,
+    passkey: String(row.passkey ?? ''),
+    escrowState: String(row.escrow_state ?? ''),
+    deliveryFee: Number(row.delivery_fee ?? 0),
+    subtotal: Number(row.subtotal ?? 0),
+    total: Number(row.total ?? 0),
+    lines: Array.isArray(row.lines) ? (row.lines as VendorPortalOrder['lines']) : [],
+    vendorId: row.vendor_id != null ? String(row.vendor_id) : '',
+    vendorConfirmed: Boolean(row.vendor_confirmed),
+    kitchenReady: status === 'ready_for_pickup',
+    cancelledAt: row.cancelled_at != null ? String(row.cancelled_at) : null,
+    cancelReason: row.cancel_reason != null ? String(row.cancel_reason) : null,
+  }
+}
+
+/** Vendor portal: open orders for this access_token. */
+export async function getVendorOrders(
+  accessToken: string,
+): Promise<{ ok: true; orders: VendorPortalOrder[] } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase.rpc('get_vendor_orders', {
+    p_token: accessToken,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+
+  const rows = Array.isArray(data) ? data : data ? [data] : []
+  return {
+    ok: true,
+    orders: rows.map((r) => rowToVendorPortalOrder(r as Record<string, unknown>)),
+  }
+}
+
+/** Vendor portal: preparing | ready_for_pickup only. */
+export async function updateOrderStatusByVendor(
+  accessToken: string,
+  orderId: string,
+  newStatus: 'preparing' | 'ready_for_pickup',
+): Promise<{ ok: true; order: VendorPortalOrder } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase.rpc('update_order_status_by_vendor', {
+    p_token: accessToken,
+    p_id: orderId,
+    p_new_status: newStatus,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || typeof row !== 'object') {
+    return { ok: false, reason: 'Status update returned no order.' }
+  }
+  return { ok: true, order: rowToVendorPortalOrder(row as Record<string, unknown>) }
+}
+
+/**
+ * Vendor portal handoff: passkey → validate_passkey_and_release_by_vendor
+ * (delegates to the sole escrow-release path).
+ */
+export async function validatePasskeyAndReleaseByVendor(
+  accessToken: string,
+  orderId: string,
+  passkey: string,
+): Promise<{ ok: true; order: VendorPortalOrder } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase.rpc('validate_passkey_and_release_by_vendor', {
+    p_token: accessToken,
+    p_id: orderId,
+    p_passkey: passkey.trim(),
+  })
+
+  if (error) return { ok: false, reason: error.message }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || typeof row !== 'object') {
+    return { ok: false, reason: 'Passkey confirmation returned no order.' }
+  }
+  return { ok: true, order: rowToVendorPortalOrder(row as Record<string, unknown>) }
 }
 
 /**

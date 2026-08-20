@@ -9,7 +9,13 @@ import {
 } from 'react'
 import type { OrderStatus, PlacedOrder } from './CartContext'
 import { syncBuyerOrder } from '../data/ops'
-import { vendorLogin } from '../lib/vendorsApi'
+import {
+  getVendorOrders,
+  updateOrderStatusByVendor,
+  validatePasskeyAndReleaseByVendor,
+  vendorLogin,
+  type VendorPortalOrder,
+} from '../lib/vendorsApi'
 import type { VerificationStatus } from '../data/vendors'
 
 export const VENDOR_AUTH_KEY = 'kampedrop-vendor-session'
@@ -23,44 +29,70 @@ export type VendorOrder = PlacedOrder & {
 
 type VendorSession = {
   vendorId: string
+  accessToken: string
   name: string
   verificationStatus: VerificationStatus | string
   active: boolean
   signedInAt: string
 }
 
+type ActionResult = { ok: true } | { ok: false; reason: string }
+
 type VendorContextValue = {
   vendorId: string | null
+  accessToken: string | null
   vendorName: string | null
   verificationStatus: string | null
   vendorActive: boolean | null
   authenticated: boolean
-  login: (
-    phone: string,
-    pin: string,
-  ) => Promise<{ ok: true } | { ok: false; reason: string }>
+  ordersLoading: boolean
+  ordersError: string | null
+  login: (phone: string, pin: string) => Promise<ActionResult>
   logout: () => void
+  refreshOrders: () => Promise<void>
   orders: VendorOrder[]
   ordersForVendor: VendorOrder[]
   ingestOrder: (order: PlacedOrder & { vendorId: string }) => void
-  acceptOrder: (id: string) => { ok: true } | { ok: false; reason: string }
-  rejectOrder: (
-    id: string,
-    reason?: string,
-  ) => { ok: true } | { ok: false; reason: string }
-  markPreparing: (id: string) => { ok: true } | { ok: false; reason: string }
-  markReady: (id: string) => { ok: true } | { ok: false; reason: string }
+  markPreparing: (id: string) => Promise<ActionResult>
+  markReadyForPickup: (id: string) => Promise<ActionResult>
+  confirmHandoff: (id: string, passkey: string) => Promise<ActionResult>
   getOrder: (id: string) => VendorOrder | undefined
 }
 
 const VendorContext = createContext<VendorContextValue | null>(null)
+
+function portalToVendorOrder(o: VendorPortalOrder): VendorOrder {
+  return {
+    id: o.id,
+    createdAt: o.createdAt,
+    customerName: o.customerName,
+    phone: o.phone,
+    address: o.address,
+    note: o.note,
+    payment: o.payment,
+    fulfillment: o.fulfillment,
+    lines: o.lines,
+    deliveryFee: o.deliveryFee,
+    subtotal: o.subtotal,
+    total: o.total,
+    status: o.status as OrderStatus,
+    passkey: o.passkey,
+    escrowState: o.escrowState as VendorOrder['escrowState'],
+    cancelledAt: o.cancelledAt,
+    cancelReason: o.cancelReason,
+    vendorId: o.vendorId,
+    vendorConfirmed: o.vendorConfirmed,
+    kitchenReady: o.kitchenReady,
+  }
+}
 
 function loadSession(): VendorSession | null {
   try {
     const raw = localStorage.getItem(VENDOR_AUTH_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as VendorSession
-    if (parsed?.vendorId) return parsed
+    // Pre-token sessions are invalid — portal RPCs need access_token
+    if (parsed?.vendorId && parsed?.accessToken) return parsed
   } catch {
     /* ignore */
   }
@@ -99,6 +131,8 @@ function persistOrderPatch(order: VendorOrder) {
 export function VendorProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<VendorSession | null>(() => loadSession())
   const [orders, setOrders] = useState<VendorOrder[]>(() => loadOrders())
+  const [ordersLoading, setOrdersLoading] = useState(false)
+  const [ordersError, setOrdersError] = useState<string | null>(null)
 
   useEffect(() => {
     try {
@@ -117,20 +151,37 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     }
   }, [orders])
 
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === VENDOR_ORDERS_KEY && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue) as VendorOrder[]
-          if (Array.isArray(parsed)) setOrders(parsed)
-        } catch {
-          /* ignore */
-        }
+  const refreshOrders = useCallback(async () => {
+    const token = session?.accessToken
+    if (!token) return
+
+    setOrdersLoading(true)
+    setOrdersError(null)
+    const result = await getVendorOrders(token)
+    setOrdersLoading(false)
+
+    if (!result.ok) {
+      setOrdersError(result.reason)
+      if (/invalid vendor access token/i.test(result.reason)) {
+        setSession(null)
       }
+      return
     }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
+
+    setOrders(result.orders.map(portalToVendorOrder))
+  }, [session?.accessToken])
+
+  useEffect(() => {
+    if (!session?.accessToken) return
+    void refreshOrders()
+    const id = window.setInterval(() => void refreshOrders(), 20_000)
+    const onFocus = () => void refreshOrders()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [session?.accessToken, refreshOrders])
 
   const login = useCallback(async (phone: string, pin: string) => {
     if (!phone.trim()) return { ok: false as const, reason: 'Enter your business phone.' }
@@ -143,6 +194,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
 
     setSession({
       vendorId: result.vendor.id,
+      accessToken: result.vendor.access_token,
       name: result.vendor.name,
       verificationStatus: result.vendor.verification_status,
       active: result.vendor.active,
@@ -151,7 +203,11 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     return { ok: true as const }
   }, [])
 
-  const logout = useCallback(() => setSession(null), [])
+  const logout = useCallback(() => {
+    setSession(null)
+    setOrders([])
+    setOrdersError(null)
+  }, [])
 
   const ingestOrder = useCallback((order: PlacedOrder & { vendorId: string }) => {
     setOrders((prev) => {
@@ -160,89 +216,54 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const patchOrder = useCallback((id: string, fn: (o: VendorOrder) => VendorOrder | null) => {
-    let result: { ok: true } | { ok: false; reason: string } = {
-      ok: false,
-      reason: 'Order not found',
-    }
+  const applyCloudOrder = useCallback((order: VendorOrder) => {
+    persistOrderPatch(order)
     setOrders((prev) => {
-      const i = prev.findIndex((o) => o.id === id)
-      if (i < 0) return prev
-      const next = fn(prev[i])
-      if (!next) {
-        result = { ok: false, reason: 'That action isn’t available for this order.' }
-        return prev
-      }
-      result = { ok: true }
-      persistOrderPatch(next)
+      const i = prev.findIndex((o) => o.id === order.id)
+      if (i < 0) return [order, ...prev]
       const copy = [...prev]
-      copy[i] = next
+      copy[i] = order
       return copy
     })
-    return result
   }, [])
 
-  const acceptOrder = useCallback(
-    (id: string) =>
-      patchOrder(id, (o) => {
-        if (o.status === 'cancelled' || o.status === 'delivered') return null
-        const status: OrderStatus =
-          o.fulfillment === 'pickup' ? 'preparing' : 'preparing'
-        return { ...o, vendorConfirmed: true, status }
-      }),
-    [patchOrder],
-  )
-
-  const rejectOrder = useCallback(
-    (id: string, reason = 'Vendor could not fulfil') =>
-      patchOrder(id, (o) => {
-        if (o.status === 'delivered' || o.status === 'cancelled') return null
-        if (o.kitchenReady || o.status === 'picked_up' || o.status === 'on_the_way') {
-          return null
-        }
-        return {
-          ...o,
-          status: 'cancelled',
-          cancelledAt: new Date().toISOString(),
-          cancelReason: reason,
-          escrowState: o.escrowState === 'held' ? 'refunded' : o.escrowState,
-        }
-      }),
-    [patchOrder],
-  )
-
   const markPreparing = useCallback(
-    (id: string) =>
-      patchOrder(id, (o) => {
-        if (o.status === 'cancelled' || o.status === 'delivered') return null
-        return { ...o, vendorConfirmed: true, status: 'preparing' }
-      }),
-    [patchOrder],
+    async (id: string) => {
+      const token = session?.accessToken
+      if (!token) return { ok: false as const, reason: 'Sign in again to update orders.' }
+      const result = await updateOrderStatusByVendor(token, id, 'preparing')
+      if (!result.ok) return { ok: false as const, reason: result.reason }
+      applyCloudOrder(portalToVendorOrder(result.order))
+      return { ok: true as const }
+    },
+    [session?.accessToken, applyCloudOrder],
   )
 
-  const markReady = useCallback(
-    (id: string) =>
-      patchOrder(id, (o) => {
-        if (o.status === 'cancelled' || o.status === 'delivered') return null
-        if (o.fulfillment === 'pickup') {
-          return {
-            ...o,
-            vendorConfirmed: true,
-            kitchenReady: true,
-            status: 'ready_for_pickup',
-          }
-        }
-        return {
-          ...o,
-          vendorConfirmed: true,
-          kitchenReady: true,
-          status:
-            o.status === 'finding_rider' || o.status === 'confirmed'
-              ? 'preparing'
-              : o.status,
-        }
-      }),
-    [patchOrder],
+  const markReadyForPickup = useCallback(
+    async (id: string) => {
+      const token = session?.accessToken
+      if (!token) return { ok: false as const, reason: 'Sign in again to update orders.' }
+      const result = await updateOrderStatusByVendor(token, id, 'ready_for_pickup')
+      if (!result.ok) return { ok: false as const, reason: result.reason }
+      applyCloudOrder(portalToVendorOrder(result.order))
+      return { ok: true as const }
+    },
+    [session?.accessToken, applyCloudOrder],
+  )
+
+  const confirmHandoff = useCallback(
+    async (id: string, passkey: string) => {
+      const token = session?.accessToken
+      if (!token) return { ok: false as const, reason: 'Sign in again to confirm handoff.' }
+      if (!passkey.trim()) {
+        return { ok: false as const, reason: 'Enter the buyer passkey.' }
+      }
+      const result = await validatePasskeyAndReleaseByVendor(token, id, passkey)
+      if (!result.ok) return { ok: false as const, reason: result.reason }
+      applyCloudOrder(portalToVendorOrder(result.order))
+      return { ok: true as const }
+    },
+    [session?.accessToken, applyCloudOrder],
   )
 
   const getOrder = useCallback(
@@ -251,6 +272,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
   )
 
   const vendorId = session?.vendorId ?? null
+  const accessToken = session?.accessToken ?? null
   const vendorName = session?.name ?? null
   const verificationStatus = session?.verificationStatus ?? null
   const vendorActive = session?.active ?? null
@@ -262,35 +284,41 @@ export function VendorProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       vendorId,
+      accessToken,
       vendorName,
       verificationStatus,
       vendorActive,
-      authenticated: Boolean(vendorId),
+      authenticated: Boolean(vendorId && accessToken),
+      ordersLoading,
+      ordersError,
       login,
       logout,
+      refreshOrders,
       orders,
       ordersForVendor,
       ingestOrder,
-      acceptOrder,
-      rejectOrder,
       markPreparing,
-      markReady,
+      markReadyForPickup,
+      confirmHandoff,
       getOrder,
     }),
     [
       vendorId,
+      accessToken,
       vendorName,
       verificationStatus,
       vendorActive,
+      ordersLoading,
+      ordersError,
       login,
       logout,
+      refreshOrders,
       orders,
       ordersForVendor,
       ingestOrder,
-      acceptOrder,
-      rejectOrder,
       markPreparing,
-      markReady,
+      markReadyForPickup,
+      confirmHandoff,
       getOrder,
     ],
   )

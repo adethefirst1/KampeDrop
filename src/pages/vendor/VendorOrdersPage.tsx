@@ -5,41 +5,69 @@ import { formatNaira } from '../../data/vendors'
 import { vendorPath } from './VendorShell'
 
 function bucket(order: ReturnType<typeof useVendor>['ordersForVendor'][number]) {
-  if (order.status === 'cancelled') return 'done'
-  if (order.status === 'delivered') return 'done'
+  if (order.status === 'cancelled' || order.status === 'delivered') return 'done'
+  if (order.status === 'picked_up' || order.status === 'on_the_way') return 'done'
+  if (order.status === 'ready_for_pickup') return 'ready'
+  if (order.status === 'preparing') return 'active'
+  if (
+    order.status === 'confirmed' ||
+    order.status === 'finding_rider' ||
+    order.status === 'rider_assigned'
+  ) {
+    return 'new'
+  }
   if (!order.vendorConfirmed) return 'new'
-  if (order.kitchenReady || order.status === 'ready_for_pickup') return 'ready'
   return 'active'
 }
 
 export function VendorOrdersPage() {
-  const { ordersForVendor } = useVendor()
+  const { ordersForVendor, ordersLoading, ordersError, refreshOrders } = useVendor()
 
   const newOrders = ordersForVendor.filter((o) => bucket(o) === 'new')
   const active = ordersForVendor.filter((o) => bucket(o) === 'active')
   const ready = ordersForVendor.filter((o) => bucket(o) === 'ready')
-  const done = ordersForVendor.filter((o) => bucket(o) === 'done').slice(0, 8)
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold tracking-[-0.03em]">Orders</h1>
-      <p className="mt-1 text-sm text-muted">
-        Accept → prepare → ready. KampeDrop still owns riders & escrow.
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-[-0.03em]">Orders</h1>
+          <p className="mt-1 text-sm text-muted">
+            Start preparing → ready (pickup) → confirm handoff with the buyer passkey.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="shrink-0 rounded-full bg-mist px-3 py-1.5 text-xs font-bold"
+          onClick={() => void refreshOrders()}
+          disabled={ordersLoading}
+        >
+          {ordersLoading ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
 
-      {!ordersForVendor.length && (
+      {ordersError && (
+        <p className="mt-4 rounded-xl bg-mango/15 px-3 py-2 text-sm font-semibold text-mango-deep">
+          {ordersError}
+        </p>
+      )}
+
+      {!ordersForVendor.length && !ordersLoading && (
         <div className="mt-8 rounded-[1.5rem] border-[3px] border-dashed border-ink/20 bg-paper px-5 py-10 text-center">
-          <p className="font-display text-xl font-semibold">No orders yet</p>
+          <p className="font-display text-xl font-semibold">No open orders</p>
           <p className="mx-auto mt-2 max-w-xs text-sm text-muted">
-            When a buyer checks out from your shop, it lands here (and can ping WhatsApp later).
+            When a buyer checks out from your shop, it lands here.
           </p>
         </div>
       )}
 
-      <Section title="New" items={newOrders} empty={null} />
-      <Section title="In kitchen" items={active} empty={null} />
-      <Section title="Ready" items={ready} empty={null} />
-      {done.length > 0 && <Section title="Recent" items={done} empty={null} />}
+      {ordersLoading && !ordersForVendor.length && (
+        <p className="mt-8 text-sm font-semibold text-muted">Loading orders…</p>
+      )}
+
+      <Section title="Incoming" items={newOrders} />
+      <Section title="In kitchen" items={active} />
+      <Section title="Ready for handoff" items={ready} />
     </div>
   )
 }
@@ -50,7 +78,6 @@ function Section({
 }: {
   title: string
   items: ReturnType<typeof useVendor>['ordersForVendor']
-  empty: null
 }) {
   if (!items.length) return null
   return (
@@ -78,9 +105,7 @@ function Section({
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-extrabold">{formatNaira(order.total)}</p>
                   <p className="mt-1 text-[11px] font-bold text-lagoon">
-                    {order.kitchenReady && order.fulfillment === 'delivery'
-                      ? 'Ready for rider'
-                      : labelForStatus(order.status, order.fulfillment)}
+                    {labelForStatus(order.status, order.fulfillment)}
                   </p>
                 </div>
               </div>

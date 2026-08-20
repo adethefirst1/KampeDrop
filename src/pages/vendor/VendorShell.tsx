@@ -31,11 +31,8 @@ export function VendorShell() {
   const displayName = vendor?.name ?? vendorName ?? 'Your business'
   const status = vendor?.verificationStatus ?? sessionStatus
   const { pathname } = useLocation()
-  const pending = ordersForVendor.filter(
-    (o) =>
-      o.status !== 'cancelled' &&
-      o.status !== 'delivered' &&
-      !o.vendorConfirmed,
+  const pending = ordersForVendor.filter((o) =>
+    ['confirmed', 'finding_rider', 'rider_assigned'].includes(o.status),
   ).length
   const awaitingReview =
     status === 'pending' || status === 'needs_info' || status === 'draft'
@@ -114,7 +111,7 @@ export function VendorShell() {
               Not approved
             </p>
             <p className="mt-1 text-sm font-semibold leading-snug">
-              {vendor.reviewNote ||
+              {vendor?.reviewNote ||
                 'We couldn’t verify this listing. WhatsApp support if you believe this is a mistake.'}
             </p>
           </div>

@@ -19,6 +19,7 @@ import {
   type Vendor,
 } from '../data/vendors'
 import {
+  fetchLiveMenuItemsByVendorIds,
   fetchLiveVendors,
   listVendorApplicationPhotoUrls,
   vendorRowToVendor,
@@ -136,9 +137,17 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     async function loadCloud() {
       const result = await fetchLiveVendors()
       if (cancelled || !result.ok) return
+
+      const menus = await fetchLiveMenuItemsByVendorIds(result.vendors.map((v) => v.id))
+      const byVendorId = menus.ok ? menus.byVendorId : {}
+
       const mapped = await Promise.all(
         result.vendors.map(async (row) =>
-          vendorRowToVendor(row, await listVendorApplicationPhotoUrls(row.id)),
+          vendorRowToVendor(
+            row,
+            await listVendorApplicationPhotoUrls(row.id),
+            byVendorId[row.id] ?? [],
+          ),
         ),
       )
       if (!cancelled) setCloudVendors(mapped)

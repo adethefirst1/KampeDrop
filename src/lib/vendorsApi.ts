@@ -1,5 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from './supabase'
-import type { Category, VerificationStatus, Vendor } from '../data/vendors'
+import type { Category, MenuItem, VerificationStatus, Vendor } from '../data/vendors'
 
 export type SubmitVendorApplicationInput = {
   name: string
@@ -277,6 +277,176 @@ export async function validatePasskeyAndReleaseByVendor(
   return { ok: true, order: rowToVendorPortalOrder(row as Record<string, unknown>) }
 }
 
+// -----------------------------------------------------------------------------
+// Menu items (cloud)
+// -----------------------------------------------------------------------------
+
+export type MenuItemRow = {
+  id: string
+  vendor_id: string
+  name: string
+  price: number
+  description: string | null
+  available: boolean
+  created_at: string
+}
+
+export function menuItemRowToMenuItem(row: MenuItemRow): MenuItem {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description?.trim() || '',
+    price: Number(row.price),
+    available: row.available !== false,
+  }
+}
+
+function asMenuItemRow(row: Record<string, unknown>): MenuItemRow {
+  return {
+    id: String(row.id),
+    vendor_id: String(row.vendor_id),
+    name: String(row.name ?? ''),
+    price: Number(row.price ?? 0),
+    description: row.description != null ? String(row.description) : null,
+    available: row.available !== false,
+    created_at: String(row.created_at ?? ''),
+  }
+}
+
+/**
+ * Buyer browse: available items for live (approved+active) vendors.
+ * RLS enforces visibility — no token needed.
+ */
+export async function fetchLiveMenuItemsByVendorIds(
+  vendorIds: string[],
+): Promise<{ ok: true; byVendorId: Record<string, MenuItem[]> } | { ok: false; reason: string }> {
+  if (!vendorIds.length) return { ok: true, byVendorId: {} }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase
+    .from('menu_items')
+    .select('id, vendor_id, name, price, description, available, created_at')
+    .in('vendor_id', vendorIds)
+    .order('created_at', { ascending: true })
+
+  if (error) return { ok: false, reason: error.message }
+
+  const byVendorId: Record<string, MenuItem[]> = {}
+  for (const id of vendorIds) byVendorId[id] = []
+  for (const raw of data ?? []) {
+    const row = asMenuItemRow(raw as Record<string, unknown>)
+    const list = byVendorId[row.vendor_id] ?? (byVendorId[row.vendor_id] = [])
+    list.push(menuItemRowToMenuItem(row))
+  }
+  return { ok: true, byVendorId }
+}
+
+/** Vendor portal: all items including unavailable. */
+export async function getVendorMenuItems(
+  accessToken: string,
+): Promise<{ ok: true; items: MenuItem[] } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase.rpc('get_vendor_menu_items', {
+    p_token: accessToken,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+
+  const rows = Array.isArray(data) ? data : data ? [data] : []
+  return {
+    ok: true,
+    items: rows.map((r) => menuItemRowToMenuItem(asMenuItemRow(r as Record<string, unknown>))),
+  }
+}
+
+export async function addMenuItem(
+  accessToken: string,
+  input: { name: string; price: number; description?: string },
+): Promise<{ ok: true; item: MenuItem } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase.rpc('add_menu_item', {
+    p_token: accessToken,
+    p_name: input.name,
+    p_price: Math.round(input.price),
+    p_description: input.description?.trim() || null,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || typeof row !== 'object') {
+    return { ok: false, reason: 'Add item returned no row.' }
+  }
+  return { ok: true, item: menuItemRowToMenuItem(asMenuItemRow(row as Record<string, unknown>)) }
+}
+
+export async function updateMenuItem(
+  accessToken: string,
+  itemId: string,
+  input: {
+    name: string
+    price: number
+    description?: string
+    available: boolean
+  },
+): Promise<{ ok: true; item: MenuItem } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase.rpc('update_menu_item', {
+    p_token: accessToken,
+    p_item_id: itemId,
+    p_name: input.name,
+    p_price: Math.round(input.price),
+    p_description: input.description?.trim() || null,
+    p_available: input.available,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || typeof row !== 'object') {
+    return { ok: false, reason: 'Update item returned no row.' }
+  }
+  return { ok: true, item: menuItemRowToMenuItem(asMenuItemRow(row as Record<string, unknown>)) }
+}
+
+export async function deleteMenuItem(
+  accessToken: string,
+  itemId: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { error } = await supabase.rpc('delete_menu_item', {
+    p_token: accessToken,
+    p_item_id: itemId,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+  return { ok: true }
+}
+
 /**
  * Upload onboarding photos to public bucket vendor-photos under
  * applications/{vendorId}/ — allowed by anon INSERT path policy.
@@ -396,10 +566,13 @@ export async function fetchLiveVendors(): Promise<
 }
 
 /**
- * Map a cloud vendors row (+ optional photo URLs) into the app Vendor shape.
- * Menu items are empty until cloud menu sync exists.
+ * Map a cloud vendors row (+ optional photo URLs + menu items) into the app Vendor shape.
  */
-export function vendorRowToVendor(row: VendorRow, photos: string[] = []): Vendor {
+export function vendorRowToVendor(
+  row: VendorRow,
+  photos: string[] = [],
+  items: MenuItem[] = [],
+): Vendor {
   const category = (
     row.category === 'mart' || row.category === 'pharmacy' ? row.category : 'food'
   ) as Category
@@ -430,7 +603,7 @@ export function vendorRowToVendor(row: VendorRow, photos: string[] = []): Vendor
     submittedAt: row.submitted_at,
     reviewNote: row.review_note,
     accessPin: '',
-    items: [],
+    items,
   }
 }
 

@@ -176,11 +176,11 @@ export function VendorPage() {
       {menuItems.length === 0 && (
         <div className="mt-10 rounded-[1.5rem] bg-paper px-5 py-10 text-center ring-1 ring-line">
           <p className="font-display text-xl font-semibold tracking-[-0.02em]">
-            Menu coming soon
+            No menu items yet
           </p>
           <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted">
-            This vendor is on KampeDrop, but their list isn’t live yet. Try another
-            shop nearby.
+            This shop is on KampeDrop, but they haven’t published dishes yet. Try
+            another nearby vendor.
           </p>
           <Link to={appPath()} className="btn-ink mt-5 inline-flex">
             Browse vendors

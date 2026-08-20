@@ -10,6 +10,7 @@ import type { DeliveryPlace } from '../data/places'
 import { DELIVERY_FEE, formatNaira } from '../data/vendors'
 import { isOrderRateLimitError, saveOrderToSupabase } from '../lib/ordersApi'
 import { initializePaystackPayment } from '../lib/paystackApi'
+import { rememberPayEmail } from '../components/PaystackPayPanel'
 
 export function CheckoutPage() {
   const { itemCount, subtotal, vendor, draftOrder, commitOrder } = useCart()
@@ -20,19 +21,43 @@ export function CheckoutPage() {
   const [fulfillment, setFulfillment] = useState<Fulfillment>('delivery')
   const [place, setPlace] = useState<DeliveryPlace | null>(null)
   const [note, setNote] = useState('')
-  const [payment, setPayment] = useState<'cod' | 'transfer' | 'card'>('transfer')
+  const [payment, setPayment] = useState<'cod' | 'transfer' | 'card'>('card')
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [placedId, setPlacedId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  /** Keep sticky totals stable after cart clears mid-Paystack handoff */
+  const [handoffTotal, setHandoffTotal] = useState<number | null>(null)
+  const [handoffFee, setHandoffFee] = useState<number | null>(null)
 
   const deliveryFee = fulfillment === 'pickup' ? 0 : DELIVERY_FEE
   const total = subtotal + deliveryFee
   const pickup = fulfillment === 'pickup'
+  const barFee = handoffFee ?? deliveryFee
+  const barTotal = handoffTotal ?? total
 
   if (placedId) {
     return <Navigate to={appPath(`/orders/${placedId}/confirmed`)} replace />
+  }
+
+  // Stay on a calm handoff screen while Paystack initializes — never bounce to Cart.
+  if (submitting) {
+    return (
+      <OrderLayout>
+        <div className="py-20 text-center">
+          <p className="font-display text-2xl font-semibold tracking-[-0.03em]">
+            Opening Paystack…
+          </p>
+          <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted">
+            Hang tight — you’ll pay on the next screen. Don’t close this tab.
+          </p>
+          <p className="mt-6 text-sm font-bold tabular-nums text-ink">
+            {formatNaira(barTotal)}
+          </p>
+        </div>
+      </OrderLayout>
+    )
   }
 
   if (!itemCount) {
@@ -48,8 +73,17 @@ export function CheckoutPage() {
     if (pickup && !vendor) {
       return
     }
+    const phoneDigits = phone.replace(/\D/g, '')
+    if (phoneDigits.length !== 11) {
+      setSubmitError('Enter an 11-digit phone number.')
+      return
+    }
     if (payment === 'cod') {
-      setSubmitError('Cash on delivery isn’t available yet. Choose transfer or card.')
+      setSubmitError(
+        pickup
+          ? 'Pay at pickup is for KampeDrop accounts. Choose card or bank transfer.'
+          : 'Cash on delivery is for KampeDrop accounts. Choose card or bank transfer.',
+      )
       return
     }
     if (payment === 'card' || payment === 'transfer') {
@@ -60,6 +94,8 @@ export function CheckoutPage() {
       }
     }
     setSubmitting(true)
+    setHandoffFee(deliveryFee)
+    setHandoffTotal(total)
     setPlaceError(false)
     setSubmitError(null)
     try {
@@ -68,7 +104,7 @@ export function CheckoutPage() {
         `${vendor?.area ?? 'Badagry'} — ${vendor?.name ?? 'vendor'}`
       const order = draftOrder({
         customerName: name.trim(),
-        phone: phone.trim(),
+        phone: phoneDigits,
         address: pickup ? pickupAddress : place!.address.trim(),
         note: note.trim(),
         payment,
@@ -93,6 +129,31 @@ export function CheckoutPage() {
           )
         }
         setSubmitting(false)
+        setHandoffFee(null)
+        setHandoffTotal(null)
+        return
+      }
+
+      // Start Paystack BEFORE clearing the cart so Checkout doesn’t remount
+      // as empty-cart → Cart while waiting on initialize.
+      if (payment === 'card' || payment === 'transfer') {
+        rememberPayEmail(order.id, email.trim())
+        const pay = await initializePaystackPayment({
+          orderId: order.id,
+          email: email.trim(),
+        })
+
+        commitOrder(order)
+        ingestPlacedOrder(order)
+        if (vendor?.id) {
+          ingestVendorOrder({ ...order, vendorId: vendor.id })
+        }
+
+        if (!pay.ok) {
+          window.location.assign(appPath(`/orders/${order.id}`))
+          return
+        }
+        window.location.assign(pay.authorizationUrl)
         return
       }
 
@@ -101,26 +162,12 @@ export function CheckoutPage() {
       if (vendor?.id) {
         ingestVendorOrder({ ...order, vendorId: vendor.id })
       }
-
-      if (payment === 'card' || payment === 'transfer') {
-        const pay = await initializePaystackPayment({
-          orderId: order.id,
-          email: email.trim(),
-        })
-        if (!pay.ok) {
-          setSubmitError(pay.reason)
-          setSubmitting(false)
-          window.location.assign(appPath(`/orders/${order.id}`))
-          return
-        }
-        window.location.assign(pay.authorizationUrl)
-        return
-      }
-
       setPlacedId(order.id)
     } catch {
       setSubmitError('Could not place your order right now. Please try again.')
       setSubmitting(false)
+      setHandoffFee(null)
+      setHandoffTotal(null)
     }
   }
 
@@ -205,9 +252,17 @@ export function CheckoutPage() {
             id="phone"
             required
             type="tel"
+            inputMode="numeric"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="0803 000 0000"
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, '').slice(0, 11)
+              setPhone(digits)
+            }}
+            maxLength={11}
+            minLength={11}
+            pattern="[0-9]{11}"
+            title="Enter an 11-digit phone number"
+            placeholder="08030000000"
             className="field"
             autoComplete="tel"
           />
@@ -265,111 +320,121 @@ export function CheckoutPage() {
 
         <fieldset>
           <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">
-            Payment
+            How will you pay?
           </legend>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="overflow-hidden rounded-2xl bg-paper ring-1 ring-line">
             {(
               [
                 {
-                  id: 'transfer' as const,
-                  title: 'Bank transfer',
-                  hint: 'Paystack virtual account',
-                  disabled: false,
+                  id: 'card' as const,
+                  title: 'Card',
+                  hint: 'Visa, Mastercard · Paystack',
+                  locked: false,
                 },
                 {
-                  id: 'card' as const,
-                  title: 'Card (Paystack)',
-                  hint: 'Pay now · test mode',
-                  disabled: false,
+                  id: 'transfer' as const,
+                  title: 'Bank transfer',
+                  hint: 'One-time account · Paystack',
+                  locked: false,
                 },
                 {
                   id: 'cod' as const,
                   title: pickup ? 'Pay at pickup' : 'Cash on delivery',
-                  hint: pickup ? 'Pay at vendor' : 'Pay the rider',
-                  disabled: true,
+                  hint: 'Available with a KampeDrop account',
+                  locked: true,
                 },
               ] as const
-            ).map((opt) => {
-              const active = !opt.disabled && payment === opt.id
+            ).map((opt, index) => {
+              const active = !opt.locked && payment === opt.id
               return (
-                <label
+                <div
                   key={opt.id}
-                  aria-disabled={opt.disabled}
-                  className={`relative rounded-2xl px-3 py-3 text-center ring-1 transition ${
-                    opt.disabled
-                      ? 'cursor-not-allowed bg-mist/70 text-muted ring-line opacity-70'
-                      : active
-                        ? 'cursor-pointer bg-ink text-white ring-ink'
-                        : 'cursor-pointer bg-paper text-ink-soft ring-line'
-                  }`}
+                  className={index > 0 ? 'border-t border-line' : undefined}
                 >
-                  {opt.disabled && (
-                    <span className="absolute right-2 top-2 rounded-md bg-ink/10 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-ink-soft">
-                      Coming soon
-                    </span>
-                  )}
-                  <input
-                    type="radio"
-                    name="payment"
-                    className="sr-only"
-                    checked={active}
-                    disabled={opt.disabled}
-                    onChange={() => {
-                      if (!opt.disabled) setPayment(opt.id)
-                    }}
-                  />
-                  <span className="block text-sm font-bold">{opt.title}</span>
-                  <span
-                    className={`mt-0.5 block text-[11px] font-medium ${
-                      active ? 'text-white/70' : 'text-muted'
+                  <label
+                    aria-disabled={opt.locked}
+                    className={`flex items-start gap-3 px-3.5 py-3.5 transition ${
+                      opt.locked
+                        ? 'cursor-not-allowed bg-mist/50'
+                        : active
+                          ? 'cursor-pointer bg-lagoon/[0.06]'
+                          : 'cursor-pointer hover:bg-mist/40'
                     }`}
                   >
-                    {opt.disabled ? 'Coming soon' : opt.hint}
-                  </span>
-                </label>
+                    <span
+                      className={`mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full ring-2 ${
+                        opt.locked
+                          ? 'ring-line bg-mist'
+                          : active
+                            ? 'ring-lagoon bg-lagoon'
+                            : 'ring-line bg-paper'
+                      }`}
+                      aria-hidden
+                    >
+                      {active && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                      )}
+                    </span>
+                    <input
+                      type="radio"
+                      name="payment"
+                      className="sr-only"
+                      checked={active}
+                      disabled={opt.locked}
+                      onChange={() => {
+                        if (!opt.locked) setPayment(opt.id)
+                      }}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`text-sm font-bold ${
+                            opt.locked ? 'text-muted' : 'text-ink'
+                          }`}
+                        >
+                          {opt.title}
+                        </span>
+                        {opt.locked && (
+                          <span className="rounded-md bg-ink/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+                            Accounts
+                          </span>
+                        )}
+                      </span>
+                      <span
+                        className={`mt-0.5 block text-[12px] leading-snug ${
+                          opt.locked ? 'text-muted/80' : 'text-muted'
+                        }`}
+                      >
+                        {opt.hint}
+                      </span>
+                    </span>
+                  </label>
+
+                  {active && (
+                    <div className="space-y-2 border-t border-line/70 bg-lagoon/[0.04] px-3.5 pb-3.5 pt-3 pl-[2.65rem]">
+                      <p className="text-xs leading-relaxed text-muted">
+                        {opt.id === 'transfer'
+                          ? 'Paystack shows a one-time account for this amount. Escrow still releases only at the handoff passkey.'
+                          : 'You’ll pay securely on Paystack. Escrow still releases only at the handoff passkey.'}
+                      </p>
+                      <Field label="Email for receipt" htmlFor="email">
+                        <input
+                          id="email"
+                          type="email"
+                          autoComplete="email"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="you@email.com"
+                          className="field"
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </div>
               )
             })}
           </div>
-          {payment === 'transfer' && (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs leading-relaxed text-muted">
-                Paystack will show a one-time account number. Escrow still releases
-                only at the handoff passkey.
-              </p>
-              <Field label="Email for transfer receipt" htmlFor="email">
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@email.com"
-                  className="field"
-                />
-              </Field>
-            </div>
-          )}
-          {payment === 'card' && (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs leading-relaxed text-muted">
-                You’ll pay securely on Paystack (test mode). Escrow still releases
-                only at the handoff passkey.
-              </p>
-              <Field label="Email for card receipt" htmlFor="email">
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  required={payment === 'card'}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@email.com"
-                  className="field"
-                />
-              </Field>
-            </div>
-          )}
         </fieldset>
 
         {submitError && (
@@ -387,9 +452,9 @@ export function CheckoutPage() {
       <StickyCommerceBar>
         <div className="mb-2 flex items-center justify-between px-1 text-xs text-white/60">
           <span>
-            {pickup ? 'Pickup' : 'Delivery'} · {formatNaira(deliveryFee)}
+            {pickup ? 'Pickup' : 'Delivery'} · {formatNaira(barFee)}
           </span>
-          <span className="font-bold text-white">{formatNaira(total)}</span>
+          <span className="font-bold text-white">{formatNaira(barTotal)}</span>
         </div>
         <button
           type="submit"
@@ -398,20 +463,12 @@ export function CheckoutPage() {
           className="flex w-full items-center justify-center rounded-xl bg-mango px-4 py-3.5 text-sm font-bold text-ink disabled:opacity-70"
         >
           {submitting
-            ? payment === 'card' || payment === 'transfer'
-              ? 'Opening Paystack…'
-              : 'Placing order…'
-            : pickup
-              ? payment === 'transfer'
-                ? 'Place pickup · pay by transfer'
-                : payment === 'card'
-                  ? 'Place pickup · pay by card'
-                  : 'Place pickup · pay at vendor'
-              : payment === 'transfer'
-                ? 'Place order · pay by transfer'
-                : payment === 'card'
-                  ? 'Place order · pay by card'
-                  : 'Place order · pay on delivery'}
+            ? 'Opening Paystack…'
+            : payment === 'card' || payment === 'transfer'
+              ? 'Continue to Paystack'
+              : pickup
+                ? 'Place pickup'
+                : 'Place order'}
         </button>
       </StickyCommerceBar>
     </OrderLayout>

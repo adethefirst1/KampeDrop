@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { OrderLayout, GuaranteePill } from '../components/layout'
 import { PaystackPayPanel } from '../components/PaystackPayPanel'
+import { OrderReceiptSheet } from '../components/OrderReceipt'
 import { HelpGuaranteePanel } from '../components/HelpGuaranteePanel'
 import { AnimatedCheck, SecureSeal } from '../components/motion'
 import {
@@ -64,6 +65,7 @@ export function TrackPage() {
   const [cloudLoading, setCloudLoading] = useState(Boolean(orderId))
   const [cloudTried, setCloudTried] = useState(false)
   const [confirmingPayment, setConfirmingPayment] = useState(false)
+  const [receiptOpen, setReceiptOpen] = useState(false)
   const verifyStarted = useRef(false)
 
   const paystackRef =
@@ -537,6 +539,8 @@ export function TrackPage() {
             paymentState: paymentState ?? (order.payment === 'card' ? 'card_pending' : 'transfer_pending'),
           }}
           confirming={confirmingPayment || Boolean(paystackRef)}
+          phone={order.phone}
+          onViewReceipt={() => setReceiptOpen(true)}
           onRetryRefresh={() => {
             void fetchOrderById(order.id).then((result) => {
               if (result.ok) setCloudOrder(result.order)
@@ -544,6 +548,14 @@ export function TrackPage() {
           }}
         />
       )}
+
+      <OrderReceiptSheet
+        open={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        order={order}
+        vendorName={vendor?.name ?? 'Vendor'}
+        category={vendor?.category ?? 'food'}
+      />
 
       {order.payment === 'transfer' && order.escrowState === 'refunded' && (
         <div className="mt-4 rounded-2xl border border-line bg-mist px-4 py-3 text-sm text-muted">

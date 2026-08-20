@@ -7,10 +7,13 @@ type Props = {
   order: Pick<OpsOrder, 'id' | 'total' | 'paymentState'> & {
     payment: 'card' | 'transfer'
   }
+  /** Phone on the order — used to resume Paystack if checkout email isn’t cached */
+  phone?: string
   /** True while we know user just returned from Paystack / verify in flight */
   confirming?: boolean
-  emailHint?: string
   onRetryRefresh?: () => void
+  /** Opens the playful keepsake receipt after payment */
+  onViewReceipt?: () => void
 }
 
 function isPaidState(state: string | undefined): boolean {
@@ -21,20 +24,44 @@ function isPaidState(state: string | undefined): boolean {
   )
 }
 
+export function payEmailStorageKey(orderId: string) {
+  return `kampedrop-pay-email-${orderId}`
+}
+
+export function rememberPayEmail(orderId: string, email: string) {
+  try {
+    sessionStorage.setItem(payEmailStorageKey(orderId), email.trim())
+  } catch {
+    /* ignore */
+  }
+}
+
+function resolvePayEmail(orderId: string, phone?: string): string | null {
+  try {
+    const cached = sessionStorage.getItem(payEmailStorageKey(orderId))?.trim()
+    if (cached && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cached)) return cached
+  } catch {
+    /* ignore */
+  }
+  const digits = (phone ?? '').replace(/\D/g, '')
+  if (digits.length >= 10) return `${digits}@orders.kampedrop.app`
+  return null
+}
+
 /**
  * Track payment strip — status first, not a second checkout form.
  * Modes: confirming | paid | failed | unpaid
  */
 export function PaystackPayPanel({
   order,
+  phone,
   confirming = false,
-  emailHint = '',
   onRetryRefresh,
+  onViewReceipt,
 }: Props) {
   const state =
     order.paymentState ??
     (order.payment === 'card' ? 'card_pending' : 'transfer_pending')
-  const [email, setEmail] = useState(emailHint)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,15 +72,28 @@ export function PaystackPayPanel({
   if (paid) {
     return (
       <div className="mt-4 rounded-2xl bg-lagoon/10 px-4 py-3 ring-1 ring-lagoon/25">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-lagoon">
-          Payment received
-        </p>
-        <p className="mt-1 text-sm font-semibold text-ink">
-          {isTransfer ? 'Bank transfer' : 'Card'} · {formatNaira(order.total)}
-        </p>
-        <p className="mt-0.5 text-xs text-muted">
-          Held until handoff passkey — vendor isn’t paid yet.
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-lagoon">
+              Payment received
+            </p>
+            <p className="mt-1 text-sm font-semibold text-ink">
+              {isTransfer ? 'Bank transfer' : 'Card'} · {formatNaira(order.total)}
+            </p>
+            <p className="mt-0.5 text-xs text-muted">
+              Held until handoff passkey — vendor isn’t paid yet.
+            </p>
+          </div>
+          {onViewReceipt && (
+            <button
+              type="button"
+              onClick={onViewReceipt}
+              className="shrink-0 rounded-full bg-paper px-2.5 py-1 text-[11px] font-bold text-lagoon ring-1 ring-lagoon/25 transition hover:bg-white"
+            >
+              View receipt
+            </button>
+          )}
+        </div>
       </div>
     )
   }
@@ -75,15 +115,16 @@ export function PaystackPayPanel({
   }
 
   async function payAgain() {
-    if (!email.trim()) {
-      setError('Enter the email you use for Paystack.')
+    const email = resolvePayEmail(order.id, phone)
+    if (!email) {
+      setError('Couldn’t resume payment. Open checkout again from your cart.')
       return
     }
     setBusy(true)
     setError(null)
     const result = await initializePaystackPayment({
       orderId: order.id,
-      email: email.trim(),
+      email,
     })
     setBusy(false)
     if (!result.ok) {
@@ -109,21 +150,6 @@ export function PaystackPayPanel({
             : `Complete card payment for ${formatNaira(order.total)}.`}
         </p>
       )}
-
-      <label className="mt-3 block">
-        <span className="text-xs font-bold uppercase tracking-wide text-muted">
-          Email for receipt
-        </span>
-        <input
-          className="field mt-1.5"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@email.com"
-          disabled={busy}
-        />
-      </label>
 
       {error && (
         <p className="mt-2 text-sm font-semibold text-mango-deep">{error}</p>

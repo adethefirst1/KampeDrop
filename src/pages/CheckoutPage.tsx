@@ -48,6 +48,10 @@ export function CheckoutPage() {
     if (pickup && !vendor) {
       return
     }
+    if (payment === 'cod') {
+      setSubmitError('Cash on delivery isn’t available yet. Choose transfer or card.')
+      return
+    }
     if (payment === 'card') {
       const trimmedEmail = email.trim()
       if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
@@ -271,33 +275,49 @@ export function CheckoutPage() {
                   id: 'transfer' as const,
                   title: 'Bank transfer',
                   hint: pickup ? 'Held until you collect' : 'Held until vendor pickup',
+                  disabled: false,
                 },
                 {
                   id: 'card' as const,
                   title: 'Card (Paystack)',
                   hint: 'Pay now · test mode',
+                  disabled: false,
                 },
                 {
                   id: 'cod' as const,
                   title: pickup ? 'Pay at pickup' : 'Cash on delivery',
                   hint: pickup ? 'Pay at vendor' : 'Pay the rider',
+                  disabled: true,
                 },
               ] as const
             ).map((opt) => {
-              const active = payment === opt.id
+              const active = !opt.disabled && payment === opt.id
               return (
                 <label
                   key={opt.id}
-                  className={`cursor-pointer rounded-2xl px-3 py-3 text-center ring-1 transition ${
-                    active ? 'bg-ink text-white ring-ink' : 'bg-paper text-ink-soft ring-line'
+                  aria-disabled={opt.disabled}
+                  className={`relative rounded-2xl px-3 py-3 text-center ring-1 transition ${
+                    opt.disabled
+                      ? 'cursor-not-allowed bg-mist/70 text-muted ring-line opacity-70'
+                      : active
+                        ? 'cursor-pointer bg-ink text-white ring-ink'
+                        : 'cursor-pointer bg-paper text-ink-soft ring-line'
                   }`}
                 >
+                  {opt.disabled && (
+                    <span className="absolute right-2 top-2 rounded-md bg-ink/10 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-ink-soft">
+                      Coming soon
+                    </span>
+                  )}
                   <input
                     type="radio"
                     name="payment"
                     className="sr-only"
                     checked={active}
-                    onChange={() => setPayment(opt.id)}
+                    disabled={opt.disabled}
+                    onChange={() => {
+                      if (!opt.disabled) setPayment(opt.id)
+                    }}
                   />
                   <span className="block text-sm font-bold">{opt.title}</span>
                   <span
@@ -305,7 +325,7 @@ export function CheckoutPage() {
                       active ? 'text-white/70' : 'text-muted'
                     }`}
                   >
-                    {opt.hint}
+                    {opt.disabled ? 'Coming soon' : opt.hint}
                   </span>
                 </label>
               )

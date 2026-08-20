@@ -154,7 +154,7 @@ export type VendorPortalOrder = {
   phone: string
   address: string
   note: string
-  payment: 'cod' | 'transfer'
+  payment: 'cod' | 'transfer' | 'card'
   fulfillment: 'delivery' | 'pickup'
   status: string
   passkey: string
@@ -168,11 +168,17 @@ export type VendorPortalOrder = {
   kitchenReady: boolean
   cancelledAt: string | null
   cancelReason: string | null
+  placeName: string | null
+  placeId: string | null
+  placeLat: number | null
+  placeLng: number | null
 }
 
 function rowToVendorPortalOrder(row: Record<string, unknown>): VendorPortalOrder {
   const fulfillment = row.fulfillment === 'pickup' ? 'pickup' : 'delivery'
   const status = String(row.status ?? '')
+  const payment =
+    row.payment === 'transfer' ? 'transfer' : row.payment === 'card' ? 'card' : 'cod'
   return {
     id: String(row.id),
     createdAt: String(row.created_at ?? ''),
@@ -180,7 +186,7 @@ function rowToVendorPortalOrder(row: Record<string, unknown>): VendorPortalOrder
     phone: String(row.phone ?? ''),
     address: String(row.address ?? ''),
     note: String(row.note ?? ''),
-    payment: row.payment === 'transfer' ? 'transfer' : 'cod',
+    payment,
     fulfillment,
     status,
     passkey: String(row.passkey ?? ''),
@@ -194,6 +200,10 @@ function rowToVendorPortalOrder(row: Record<string, unknown>): VendorPortalOrder
     kitchenReady: status === 'ready_for_pickup',
     cancelledAt: row.cancelled_at != null ? String(row.cancelled_at) : null,
     cancelReason: row.cancel_reason != null ? String(row.cancel_reason) : null,
+    placeName: row.place_name != null ? String(row.place_name) : null,
+    placeId: row.place_id != null ? String(row.place_id) : null,
+    placeLat: typeof row.place_lat === 'number' ? row.place_lat : null,
+    placeLng: typeof row.place_lng === 'number' ? row.place_lng : null,
   }
 }
 

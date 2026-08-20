@@ -38,6 +38,8 @@ export function VendorOrderDetailPage() {
     return <Navigate to={vendorPath()} replace />
   }
 
+  const orderIdSafe = order.id
+
   const terminal =
     order.status === 'cancelled' ||
     order.status === 'delivered' ||
@@ -77,7 +79,7 @@ export function VendorOrderDetailPage() {
     setBusy(true)
     setError(null)
     try {
-      const result = await confirmHandoff(order.id, passkey)
+      const result = await confirmHandoff(orderIdSafe, passkey)
       if (!result.ok) {
         setError(result.reason)
         return

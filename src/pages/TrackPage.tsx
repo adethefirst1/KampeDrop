@@ -436,7 +436,7 @@ export function TrackPage() {
           order={{
             id: order.id,
             total: order.total,
-            paymentState,
+            paymentState: paymentState ?? 'card_pending',
           }}
           onPaidRefresh={() => {
             void fetchOrderById(order.id).then((result) => {

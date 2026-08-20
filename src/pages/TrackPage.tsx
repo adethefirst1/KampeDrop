@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { OrderLayout, GuaranteePill } from '../components/layout'
 import { TransferPayPanel } from '../components/TransferPayPanel'
+import { CardPayPanel } from '../components/CardPayPanel'
 import { HelpGuaranteePanel } from '../components/HelpGuaranteePanel'
 import { AnimatedCheck, SecureSeal } from '../components/motion'
 import {
@@ -430,6 +431,21 @@ export function TrackPage() {
         />
       )}
 
+      {order.payment === 'card' && !cancelled && (
+        <CardPayPanel
+          order={{
+            id: order.id,
+            total: order.total,
+            paymentState,
+          }}
+          onPaidRefresh={() => {
+            void fetchOrderById(order.id).then((result) => {
+              if (result.ok) setCloudOrder(result.order)
+            })
+          }}
+        />
+      )}
+
       {order.payment === 'transfer' && order.escrowState === 'refunded' && (
         <div className="mt-4 rounded-2xl border border-line bg-mist px-4 py-3 text-sm text-muted">
           Transfer refunded — you won’t be charged for this order.
@@ -486,7 +502,9 @@ export function TrackPage() {
               ? pickup
                 ? 'Pay at vendor'
                 : 'Cash on delivery'
-              : 'Transfer'}{' '}
+              : order.payment === 'card'
+                ? 'Card'
+                : 'Transfer'}{' '}
             · total
           </span>
           <span className="font-display text-lg font-semibold">

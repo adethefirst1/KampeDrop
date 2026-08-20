@@ -38,9 +38,11 @@ const tones: Record<Category, ConfirmTone> = {
         ? pickup
           ? 'Next: transfer into escrow, then bring your passkey when you collect.'
           : 'Next: transfer into escrow — vendor is paid only at pickup passkey.'
-        : pickup
-          ? 'Pay at the vendor when you collect. Keep your passkey ready.'
-          : 'Pay the rider at your door. We’ll keep you posted on the way.',
+        : payment === 'card'
+          ? 'Next: complete Paystack card payment. Escrow releases at handoff passkey.'
+          : pickup
+            ? 'Pay at the vendor when you collect. Keep your passkey ready.'
+            : 'Pay the rider at your door. We’ll keep you posted on the way.',
     shell: 'bg-[#1a120c] text-[#fff6ea]',
     wash: 'from-[#3d2418] via-[#1a120c] to-[#0e1c18]',
     ink: 'text-[#fff6ea]',
@@ -59,9 +61,11 @@ const tones: Record<Category, ConfirmTone> = {
     nextHint: (payment, pickup) =>
       payment === 'transfer'
         ? 'Next: transfer into escrow. Payment releases only at vendor handoff passkey.'
-        : pickup
-          ? 'Pay at the pharmacy counter when you collect.'
-          : 'Pay the rider on delivery. Pack stays sealed until handoff.',
+        : payment === 'card'
+          ? 'Next: complete Paystack card payment. Escrow releases at handoff passkey.'
+          : pickup
+            ? 'Pay at the pharmacy counter when you collect.'
+            : 'Pay the rider on delivery. Pack stays sealed until handoff.',
     shell: 'bg-lagoon-deep text-white',
     wash: 'from-[#063834] via-lagoon-deep to-[#041c22]',
     ink: 'text-white',
@@ -80,9 +84,11 @@ const tones: Record<Category, ConfirmTone> = {
     nextHint: (payment, pickup) =>
       payment === 'transfer'
         ? 'Next: transfer into escrow — held until vendor handoff.'
-        : pickup
-          ? 'Pay at the mart when you collect.'
-          : 'Pay the rider at your door. Essentials, tracked.',
+        : payment === 'card'
+          ? 'Next: complete Paystack card payment. Escrow releases at handoff passkey.'
+          : pickup
+            ? 'Pay at the mart when you collect.'
+            : 'Pay the rider at your door. Essentials, tracked.',
     shell: 'bg-ink text-white',
     wash: 'from-[#0a2a24] via-ink to-[#06181c]',
     ink: 'text-white',

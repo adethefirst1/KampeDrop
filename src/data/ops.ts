@@ -32,6 +32,9 @@ export type OpsOrder = PlacedOrder & {
     | 'transfer_pending'
     | 'transfer_seen'
     | 'transfer_confirmed'
+    | 'card_pending'
+    | 'card_paid'
+    | 'card_failed'
     | 'held'
     | 'released'
     | 'refunded'
@@ -243,7 +246,9 @@ export function migrateStatus(raw: string | undefined): OrderStatus {
 }
 
 export function normalizeOpsOrder(raw: Record<string, unknown>): OpsOrder {
-  const payment = (raw.payment as PlacedOrder['payment']) === 'transfer' ? 'transfer' : 'cod'
+  const rawPay = raw.payment as PlacedOrder['payment']
+  const payment: PlacedOrder['payment'] =
+    rawPay === 'transfer' ? 'transfer' : rawPay === 'card' ? 'card' : 'cod'
   const fulfillment: Fulfillment =
     raw.fulfillment === 'pickup' ? 'pickup' : 'delivery'
   let status = migrateStatus(raw.status as string | undefined)
@@ -272,6 +277,7 @@ export function normalizeOpsOrder(raw: Record<string, unknown>): OpsOrder {
   let paymentState = raw.paymentState as OpsOrder['paymentState']
   if (!paymentState) {
     if (payment === 'cod') paymentState = 'cod'
+    else if (payment === 'card') paymentState = 'card_pending'
     else if (escrowState === 'released') paymentState = 'released'
     else if (escrowState === 'refunded') paymentState = 'refunded'
     else paymentState = 'transfer_pending'
@@ -527,7 +533,12 @@ export function timeAgo(iso: string): string {
 }
 
 export function placedToOps(order: PlacedOrder): OpsOrder {
-  const paymentState = order.payment === 'cod' ? 'cod' : 'transfer_pending'
+  const paymentState =
+    order.payment === 'cod'
+      ? 'cod'
+      : order.payment === 'card'
+        ? 'card_pending'
+        : 'transfer_pending'
   const pickup = order.fulfillment === 'pickup'
   return {
     ...order,
@@ -543,10 +554,14 @@ export function placedToOps(order: PlacedOrder): OpsOrder {
         text: pickup
           ? order.payment === 'cod'
             ? 'Pickup order — pay at vendor on collect. Kitchen can start.'
-            : 'Pickup order — awaiting transfer into escrow. Kitchen can start after pay is seen.'
+            : order.payment === 'card'
+              ? 'Pickup order — awaiting card payment (Paystack). Kitchen can start after paid.'
+              : 'Pickup order — awaiting transfer into escrow. Kitchen can start after pay is seen.'
           : order.payment === 'cod'
             ? 'COD order — finding rider before kitchen starts.'
-            : 'Transfer order — awaiting buyer payment into escrow. Finding rider after pay is seen.',
+            : order.payment === 'card'
+              ? 'Card order — awaiting Paystack payment. Finding rider after paid.'
+              : 'Transfer order — awaiting buyer payment into escrow. Finding rider after pay is seen.',
       },
     ],
   }

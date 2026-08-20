@@ -10,7 +10,7 @@ export type OrderRow = {
   phone: string
   address: string
   note: string
-  payment: 'cod' | 'transfer'
+  payment: 'cod' | 'transfer' | 'card'
   fulfillment: 'delivery' | 'pickup'
   status: string
   passkey: string
@@ -46,7 +46,12 @@ export function placedOrderToRow(order: PlacedOrder): OrderRow {
     status: order.status,
     passkey: order.passkey,
     escrow_state: order.escrowState,
-    payment_state: order.payment === 'cod' ? 'cod' : 'transfer_pending',
+    payment_state:
+      order.payment === 'cod'
+        ? 'cod'
+        : order.payment === 'card'
+          ? 'card_pending'
+          : 'transfer_pending',
     delivery_fee: order.deliveryFee,
     subtotal: order.subtotal,
     total: order.total,
@@ -66,7 +71,8 @@ export function placedOrderToRow(order: PlacedOrder): OrderRow {
 }
 
 export function rowToPlacedOrder(row: OrderRow): PlacedOrder {
-  const payment = row.payment === 'transfer' ? 'transfer' : 'cod'
+  const payment: PlacedOrder['payment'] =
+    row.payment === 'transfer' ? 'transfer' : row.payment === 'card' ? 'card' : 'cod'
   const fulfillment: Fulfillment =
     row.fulfillment === 'pickup' ? 'pickup' : 'delivery'
   return {

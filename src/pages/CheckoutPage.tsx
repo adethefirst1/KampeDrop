@@ -9,6 +9,7 @@ import { useVendor } from '../context/VendorContext'
 import type { DeliveryPlace } from '../data/places'
 import { DELIVERY_FEE, formatNaira } from '../data/vendors'
 import { isOrderRateLimitError, saveOrderToSupabase } from '../lib/ordersApi'
+import { initializePaystackPayment } from '../lib/paystackApi'
 
 export function CheckoutPage() {
   const { itemCount, subtotal, vendor, draftOrder, commitOrder } = useCart()
@@ -19,7 +20,8 @@ export function CheckoutPage() {
   const [fulfillment, setFulfillment] = useState<Fulfillment>('delivery')
   const [place, setPlace] = useState<DeliveryPlace | null>(null)
   const [note, setNote] = useState('')
-  const [payment, setPayment] = useState<'cod' | 'transfer'>('transfer')
+  const [payment, setPayment] = useState<'cod' | 'transfer' | 'card'>('transfer')
+  const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [placedId, setPlacedId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState(false)
@@ -45,6 +47,13 @@ export function CheckoutPage() {
     }
     if (pickup && !vendor) {
       return
+    }
+    if (payment === 'card') {
+      const trimmedEmail = email.trim()
+      if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        setSubmitError('Enter a valid email for card payment receipts.')
+        return
+      }
     }
     setSubmitting(true)
     setPlaceError(false)
@@ -88,6 +97,23 @@ export function CheckoutPage() {
       if (vendor?.id) {
         ingestVendorOrder({ ...order, vendorId: vendor.id })
       }
+
+      if (payment === 'card') {
+        const pay = await initializePaystackPayment({
+          orderId: order.id,
+          email: email.trim(),
+        })
+        if (!pay.ok) {
+          // Order exists — send buyer to track to retry Paystack
+          setSubmitError(pay.reason)
+          setSubmitting(false)
+          window.location.assign(appPath(`/orders/${order.id}`))
+          return
+        }
+        window.location.assign(pay.authorizationUrl)
+        return
+      }
+
       setPlacedId(order.id)
     } catch {
       setSubmitError('Could not place your order right now. Please try again.')
@@ -238,13 +264,18 @@ export function CheckoutPage() {
           <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">
             Payment
           </legend>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {(
               [
                 {
                   id: 'transfer' as const,
                   title: 'Bank transfer',
                   hint: pickup ? 'Held until you collect' : 'Held until vendor pickup',
+                },
+                {
+                  id: 'card' as const,
+                  title: 'Card (Paystack)',
+                  hint: 'Pay now · test mode',
                 },
                 {
                   id: 'cod' as const,
@@ -290,6 +321,26 @@ export function CheckoutPage() {
               .
             </p>
           )}
+          {payment === 'card' && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs leading-relaxed text-muted">
+                You’ll pay securely on Paystack (test mode). Escrow still releases
+                only at the handoff passkey.
+              </p>
+              <Field label="Email for card receipt" htmlFor="email">
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  required={payment === 'card'}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@email.com"
+                  className="field"
+                />
+              </Field>
+            </div>
+          )}
         </fieldset>
 
         {submitError && (
@@ -318,14 +369,20 @@ export function CheckoutPage() {
           className="flex w-full items-center justify-center rounded-xl bg-mango px-4 py-3.5 text-sm font-bold text-ink disabled:opacity-70"
         >
           {submitting
-            ? 'Placing order…'
+            ? payment === 'card'
+              ? 'Opening Paystack…'
+              : 'Placing order…'
             : pickup
               ? payment === 'transfer'
                 ? 'Place pickup · pay by transfer'
-                : 'Place pickup · pay at vendor'
+                : payment === 'card'
+                  ? 'Place pickup · pay by card'
+                  : 'Place pickup · pay at vendor'
               : payment === 'transfer'
                 ? 'Place order · pay by transfer'
-                : 'Place order · pay on delivery'}
+                : payment === 'card'
+                  ? 'Place order · pay by card'
+                  : 'Place order · pay on delivery'}
         </button>
       </StickyCommerceBar>
     </OrderLayout>

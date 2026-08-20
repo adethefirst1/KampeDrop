@@ -41,7 +41,7 @@ export type PlacedOrder = {
   phone: string
   address: string
   note: string
-  payment: 'cod' | 'transfer'
+  payment: 'cod' | 'transfer' | 'card'
   /** Delivery to door, or customer collects at vendor */
   fulfillment: Fulfillment
   lines: CartLine[]
@@ -66,7 +66,7 @@ type PlaceOrderInput = {
   phone: string
   address: string
   note: string
-  payment: 'cod' | 'transfer'
+  payment: 'cod' | 'transfer' | 'card'
   fulfillment: Fulfillment
   placeName?: string | null
   placeId?: string | null

@@ -3,8 +3,7 @@ import { appPath } from '../paths'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { OrderLayout, GuaranteePill } from '../components/layout'
-import { TransferPayPanel } from '../components/TransferPayPanel'
-import { CardPayPanel } from '../components/CardPayPanel'
+import { PaystackPayPanel } from '../components/PaystackPayPanel'
 import { HelpGuaranteePanel } from '../components/HelpGuaranteePanel'
 import { AnimatedCheck, SecureSeal } from '../components/motion'
 import {
@@ -34,7 +33,7 @@ export function TrackPage() {
   const { orderId } = useParams()
   const { lastOrder } = useCart()
   const { getVendor } = useCatalog()
-  const { getOrder: getOpsOrder, cancelOrder, claimTransferPaid, flagProblem } =
+  const { getOrder: getOpsOrder, cancelOrder, flagProblem } =
     useOps()
   const reduce = useReducedMotion()
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -418,25 +417,13 @@ export function TrackPage() {
         </div>
       )}
 
-      {order.payment === 'transfer' && !cancelled && (
-        <TransferPayPanel
+      {(order.payment === 'transfer' || order.payment === 'card') && !cancelled && (
+        <PaystackPayPanel
           order={{
             id: order.id,
             total: order.total,
             payment: order.payment,
-            escrowState: order.escrowState,
-            paymentState,
-          }}
-          onClaimPaid={() => claimTransferPaid(order.id)}
-        />
-      )}
-
-      {order.payment === 'card' && !cancelled && (
-        <CardPayPanel
-          order={{
-            id: order.id,
-            total: order.total,
-            paymentState: paymentState ?? 'card_pending',
+            paymentState: paymentState ?? (order.payment === 'card' ? 'card_pending' : 'transfer_pending'),
           }}
           onPaidRefresh={() => {
             void fetchOrderById(order.id).then((result) => {

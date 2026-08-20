@@ -25,8 +25,8 @@ export const SITE = {
     'Agbara edge',
   ],
   /**
-   * Escrow receiving account (Phase 1 manual transfer).
-   * Replace with real KampeDrop account before pilot.
+   * @deprecated Manual escrow account — retired for Paystack bank_transfer VAs.
+   * Kept only so older copy/imports don’t break until fully removed.
    */
   transferAccount: {
     bankName: 'Providus Bank',

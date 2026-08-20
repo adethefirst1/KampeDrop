@@ -36,8 +36,8 @@ const tones: Record<Category, ConfirmTone> = {
     nextHint: (payment, pickup) =>
       payment === 'transfer'
         ? pickup
-          ? 'Next: transfer into escrow, then bring your passkey when you collect.'
-          : 'Next: transfer into escrow — vendor is paid only at pickup passkey.'
+          ? 'Next: Paystack shows a one-time account — then bring your passkey when you collect.'
+          : 'Next: Paystack shows a one-time account — vendor is paid only at pickup passkey.'
         : payment === 'card'
           ? 'Next: complete Paystack card payment. Escrow releases at handoff passkey.'
           : pickup
@@ -60,7 +60,7 @@ const tones: Record<Category, ConfirmTone> = {
         : `${first}, ${vendor} is preparing a sealed pack. Careful handoff, clear tracking.`,
     nextHint: (payment, pickup) =>
       payment === 'transfer'
-        ? 'Next: transfer into escrow. Payment releases only at vendor handoff passkey.'
+        ? 'Next: Paystack shows a one-time account. Payment releases only at vendor handoff passkey.'
         : payment === 'card'
           ? 'Next: complete Paystack card payment. Escrow releases at handoff passkey.'
           : pickup
@@ -83,7 +83,7 @@ const tones: Record<Category, ConfirmTone> = {
         : `${first}, ${vendor} is packing what you need — solid, counted, on the way.`,
     nextHint: (payment, pickup) =>
       payment === 'transfer'
-        ? 'Next: transfer into escrow — held until vendor handoff.'
+        ? 'Next: Paystack shows a one-time account — held until vendor handoff.'
         : payment === 'card'
           ? 'Next: complete Paystack card payment. Escrow releases at handoff passkey.'
           : pickup

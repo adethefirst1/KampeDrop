@@ -22,6 +22,14 @@ function timingSafeEqual(a: string, b: string): boolean {
   return out === 0
 }
 
+function isPaidState(state: string | null | undefined): boolean {
+  return (
+    state === 'card_paid' ||
+    state === 'transfer_confirmed' ||
+    state === 'released'
+  )
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -52,7 +60,8 @@ Deno.serve(async (req) => {
       status?: string
       amount?: number
       currency?: string
-      metadata?: { order_id?: string }
+      channel?: string
+      metadata?: { order_id?: string; payment_method?: string }
     }
   }
   try {
@@ -79,11 +88,9 @@ Deno.serve(async (req) => {
   // Resolve order: prefer metadata.order_id, else strip retry suffix from reference
   let orderId = orderIdFromMeta
   if (!orderId && reference) {
-    // references look like `${orderId}-${timestamp36}` or plain order id
     const maybe = reference.includes('-')
       ? reference.replace(/-[a-z0-9]+$/i, '')
       : reference
-    // Order ids are SD-… — if strip broke it, fall back to looking up by paystack_reference
     orderId = maybe.startsWith('SD-') ? maybe : undefined
   }
 
@@ -109,20 +116,17 @@ Deno.serve(async (req) => {
     }
     if (!order) {
       console.error('webhook: order not found', { orderId, reference })
-      // 200 so Paystack does not retry forever for unknown refs
       return jsonResponse({ received: true, ignored: 'order not found' })
     }
 
-    if (order.payment !== 'card') {
-      return jsonResponse({ received: true, ignored: 'not a card order' })
+    if (order.payment !== 'card' && order.payment !== 'transfer') {
+      return jsonResponse({ received: true, ignored: 'not a paystack order' })
     }
 
-    // Idempotent success
-    if (order.payment_state === 'card_paid' || order.payment_state === 'released') {
+    if (isPaidState(order.payment_state)) {
       return jsonResponse({ received: true, already: 'paid' })
     }
 
-    // Amount check (Paystack sends kobo)
     const expectedKobo = Math.round(Number(order.total) * 100)
     if (typeof data?.amount === 'number' && data.amount !== expectedKobo) {
       console.error('Amount mismatch', {
@@ -133,12 +137,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ received: true, ignored: 'amount mismatch' }, 200)
     }
 
+    // Keep field naming by payment method:
+    //   card     → card_paid
+    //   transfer → transfer_confirmed (Paystack VA paid; escrow still held)
+    const nextState =
+      order.payment === 'transfer' ? 'transfer_confirmed' : 'card_paid'
+
     const { error: updateError } = await admin
       .from('orders')
       .update({
-        payment_state: 'card_paid',
+        payment_state: nextState,
         paystack_reference: reference,
-        // escrow stays held until passkey release (same as transfer)
       })
       .eq('id', order.id)
 
@@ -147,7 +156,12 @@ Deno.serve(async (req) => {
       return textResponse('Update failed', 500)
     }
 
-    return jsonResponse({ received: true, order_id: order.id, payment_state: 'card_paid' })
+    return jsonResponse({
+      received: true,
+      order_id: order.id,
+      payment_state: nextState,
+      channel: data?.channel ?? null,
+    })
   }
 
   if (eventName === 'charge.failed') {
@@ -163,19 +177,36 @@ Deno.serve(async (req) => {
     if (error || !order) {
       return jsonResponse({ received: true, ignored: 'order not found' })
     }
-    if (order.payment !== 'card') {
-      return jsonResponse({ received: true, ignored: 'not a card order' })
+    if (order.payment !== 'card' && order.payment !== 'transfer') {
+      return jsonResponse({ received: true, ignored: 'not a paystack order' })
     }
-    if (order.payment_state === 'card_paid' || order.payment_state === 'released') {
+    if (isPaidState(order.payment_state)) {
       return jsonResponse({ received: true, already: 'paid' })
+    }
+
+    // Card gets an explicit failed state; transfer stays pending so buyer can retry VA
+    if (order.payment === 'card') {
+      await admin
+        .from('orders')
+        .update({ payment_state: 'card_failed' })
+        .eq('id', order.id)
+      return jsonResponse({
+        received: true,
+        order_id: order.id,
+        payment_state: 'card_failed',
+      })
     }
 
     await admin
       .from('orders')
-      .update({ payment_state: 'card_failed' })
+      .update({ payment_state: 'transfer_pending' })
       .eq('id', order.id)
 
-    return jsonResponse({ received: true, order_id: order.id, payment_state: 'card_failed' })
+    return jsonResponse({
+      received: true,
+      order_id: order.id,
+      payment_state: 'transfer_pending',
+    })
   }
 
   return jsonResponse({ received: true, ignored: eventName || 'unknown event' })

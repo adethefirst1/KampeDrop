@@ -640,40 +640,34 @@ export function AdminOrderPage() {
         {order.payment === 'transfer' && (
           <div className="mt-3">
             <p className="text-xs font-bold text-muted">
-              Transfer ·{' '}
-              {order.paymentState === 'transfer_pending' && 'Awaiting buyer'}
-              {order.paymentState === 'transfer_seen' && 'Buyer claims paid'}
-              {order.paymentState === 'transfer_confirmed' && 'Confirmed'}
+              Transfer (Paystack) ·{' '}
+              {order.paymentState === 'transfer_pending' && 'Awaiting Paystack VA payment'}
+              {order.paymentState === 'transfer_seen' && 'Legacy: buyer claimed paid'}
+              {order.paymentState === 'transfer_confirmed' && 'Confirmed via Paystack'}
               {order.paymentState === 'released' && 'Released'}
               {order.paymentState === 'refunded' && 'Refunded'}
               {order.paymentState === 'held' && 'Held'}
             </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {order.paymentState === 'transfer_seen' && (
-                <button
-                  type="button"
-                  className="btn-primary !px-4 !py-2 text-sm"
-                  onClick={() => void runAsync(confirmTransfer(order.id))}
-                >
-                  Confirm transfer received
-                </button>
-              )}
-              {order.paymentState === 'transfer_pending' && (
-                <p className="text-sm text-muted">
-                  Waiting for buyer to tap “I’ve paid” (or confirm if you already see it).
-                </p>
-              )}
-              {(order.paymentState === 'transfer_pending' ||
-                order.paymentState === 'transfer_seen') && (
-                <button
-                  type="button"
-                  className="rounded-xl bg-mist px-4 py-2 text-sm font-bold ring-1 ring-line"
-                  onClick={() => void runAsync(confirmTransfer(order.id))}
-                >
-                  Confirm transfer anyway
-                </button>
-              )}
-            </div>
+            {order.paymentState === 'transfer_pending' && (
+              <p className="mt-2 text-sm text-muted">
+                Waiting for Paystack webhook — no manual confirm needed.
+              </p>
+            )}
+            {order.paymentState === 'transfer_seen' && (
+              <p className="mt-2 text-sm text-muted">
+                Legacy claim — prefer waiting for Paystack, or confirm below only if you
+                already see the credit.
+              </p>
+            )}
+            {order.paymentState === 'transfer_seen' && (
+              <button
+                type="button"
+                className="btn-primary mt-2 !px-4 !py-2 text-sm"
+                onClick={() => void runAsync(confirmTransfer(order.id))}
+              >
+                Confirm transfer received (legacy)
+              </button>
+            )}
             {actionError && (
               <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
                 {actionError}
@@ -681,8 +675,18 @@ export function AdminOrderPage() {
             )}
           </div>
         )}
+        {order.payment === 'card' && (
+          <p className="mt-3 text-xs font-bold text-muted">
+            Card (Paystack) ·{' '}
+            {order.paymentState === 'card_pending' && 'Awaiting payment'}
+            {order.paymentState === 'card_paid' && 'Paid'}
+            {order.paymentState === 'card_failed' && 'Failed — buyer can retry'}
+            {order.paymentState === 'released' && 'Released'}
+          </p>
+        )}
         <p className="mt-2 text-xs text-muted">
-          Paystack payout hooks in on pickup release later.
+          Paystack confirms card and bank-transfer payments via webhook. Escrow still
+          releases at passkey handoff.
         </p>
       </section>
 

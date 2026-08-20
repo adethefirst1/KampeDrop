@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'order_id is required.' }, 400)
   }
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return jsonResponse({ error: 'A valid email is required for card payment.' }, 400)
+    return jsonResponse({ error: 'A valid email is required for Paystack payment.' }, 400)
   }
 
   const admin = createClient(supabaseUrl, serviceKey, {
@@ -62,29 +62,44 @@ Deno.serve(async (req) => {
   if (!order) {
     return jsonResponse({ error: 'Order not found.' }, 404)
   }
-  if (order.payment !== 'card') {
-    return jsonResponse({ error: 'This order is not a card payment.' }, 400)
+  if (order.payment !== 'card' && order.payment !== 'transfer') {
+    return jsonResponse({ error: 'This order is not a Paystack payment.' }, 400)
   }
   if (order.status === 'cancelled') {
     return jsonResponse({ error: 'Order is cancelled.' }, 400)
   }
-  if (order.payment_state === 'card_paid' || order.payment_state === 'released') {
+
+  const alreadyPaid =
+    order.payment_state === 'card_paid' ||
+    order.payment_state === 'transfer_confirmed' ||
+    order.payment_state === 'released'
+  if (alreadyPaid) {
     return jsonResponse({ error: 'This order is already paid.' }, 400)
   }
-  if (
-    order.payment_state !== 'card_pending' &&
-    order.payment_state !== 'card_failed'
-  ) {
+
+  const canStartCard =
+    order.payment === 'card' &&
+    (order.payment_state === 'card_pending' || order.payment_state === 'card_failed')
+  const canStartTransfer =
+    order.payment === 'transfer' &&
+    (order.payment_state === 'transfer_pending' ||
+      order.payment_state === 'transfer_seen' ||
+      order.payment_state === 'held')
+
+  if (!canStartCard && !canStartTransfer) {
     return jsonResponse(
-      { error: `Cannot start card payment from state "${order.payment_state}".` },
+      { error: `Cannot start Paystack payment from state "${order.payment_state}".` },
       400,
     )
   }
 
   const amountKobo = Math.round(Number(order.total) * 100)
   if (!Number.isFinite(amountKobo) || amountKobo < 100) {
-    return jsonResponse({ error: 'Order total is too small for card payment.' }, 400)
+    return jsonResponse({ error: 'Order total is too small for Paystack payment.' }, 400)
   }
+
+  // card → card only; transfer → bank_transfer only (Paystack virtual account)
+  const channels = order.payment === 'transfer' ? ['bank_transfer'] : ['card']
 
   // Unique reference per attempt so failed retries can re-initialize
   const reference = `${order.id}-${Date.now().toString(36)}`
@@ -103,8 +118,10 @@ Deno.serve(async (req) => {
       currency: 'NGN',
       reference,
       callback_url: callbackUrl,
+      channels,
       metadata: {
         order_id: order.id,
+        payment_method: order.payment,
         customer_name: order.customer_name,
         phone: order.phone,
         custom_fields: [
@@ -133,10 +150,12 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Paystack did not return a checkout URL.' }, 502)
   }
 
+  const pendingState = order.payment === 'transfer' ? 'transfer_pending' : 'card_pending'
+
   const { error: patchError } = await admin
     .from('orders')
     .update({
-      payment_state: 'card_pending',
+      payment_state: pendingState,
       paystack_reference: reference,
       paystack_access_code: accessCode ?? null,
     })
@@ -152,5 +171,6 @@ Deno.serve(async (req) => {
     access_code: accessCode ?? null,
     reference,
     order_id: order.id,
+    channels,
   })
 })

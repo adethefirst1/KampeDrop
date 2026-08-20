@@ -6,7 +6,8 @@ const FUNCTIONS_BASE = () => {
 }
 
 /**
- * Start Paystack checkout for an existing card order (Edge Function).
+ * Start Paystack checkout for an existing card or bank-transfer order.
+ * Channel is chosen server-side from orders.payment (card | bank_transfer).
  * Secret key never touches the browser.
  */
 export async function initializePaystackPayment(input: {
@@ -47,7 +48,7 @@ export async function initializePaystackPayment(input: {
   if (!res.ok || !json?.authorization_url) {
     return {
       ok: false,
-      reason: json?.error || 'Could not start card payment. Try again.',
+      reason: json?.error || 'Could not start Paystack payment. Try again.',
     }
   }
 

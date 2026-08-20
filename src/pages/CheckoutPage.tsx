@@ -52,10 +52,10 @@ export function CheckoutPage() {
       setSubmitError('Cash on delivery isn’t available yet. Choose transfer or card.')
       return
     }
-    if (payment === 'card') {
+    if (payment === 'card' || payment === 'transfer') {
       const trimmedEmail = email.trim()
       if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-        setSubmitError('Enter a valid email for card payment receipts.')
+        setSubmitError('Enter a valid email for Paystack payment.')
         return
       }
     }
@@ -102,13 +102,12 @@ export function CheckoutPage() {
         ingestVendorOrder({ ...order, vendorId: vendor.id })
       }
 
-      if (payment === 'card') {
+      if (payment === 'card' || payment === 'transfer') {
         const pay = await initializePaystackPayment({
           orderId: order.id,
           email: email.trim(),
         })
         if (!pay.ok) {
-          // Order exists — send buyer to track to retry Paystack
           setSubmitError(pay.reason)
           setSubmitting(false)
           window.location.assign(appPath(`/orders/${order.id}`))
@@ -274,7 +273,7 @@ export function CheckoutPage() {
                 {
                   id: 'transfer' as const,
                   title: 'Bank transfer',
-                  hint: pickup ? 'Held until you collect' : 'Held until vendor pickup',
+                  hint: 'Paystack virtual account',
                   disabled: false,
                 },
                 {
@@ -332,14 +331,24 @@ export function CheckoutPage() {
             })}
           </div>
           {payment === 'transfer' && (
-            <p className="mt-2 text-xs leading-relaxed text-muted">
-              You’ll get bank details on the next screen. Transfer to KampeDrop
-              escrow — vendor is paid only after{' '}
-              {pickup
-                ? 'you collect with your passkey'
-                : 'the rider collects at the vendor (passkey)'}
-              .
-            </p>
+            <div className="mt-3 space-y-2">
+              <p className="text-xs leading-relaxed text-muted">
+                Paystack will show a one-time account number. Escrow still releases
+                only at the handoff passkey.
+              </p>
+              <Field label="Email for transfer receipt" htmlFor="email">
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@email.com"
+                  className="field"
+                />
+              </Field>
+            </div>
           )}
           {payment === 'card' && (
             <div className="mt-3 space-y-2">
@@ -389,7 +398,7 @@ export function CheckoutPage() {
           className="flex w-full items-center justify-center rounded-xl bg-mango px-4 py-3.5 text-sm font-bold text-ink disabled:opacity-70"
         >
           {submitting
-            ? payment === 'card'
+            ? payment === 'card' || payment === 'transfer'
               ? 'Opening Paystack…'
               : 'Placing order…'
             : pickup

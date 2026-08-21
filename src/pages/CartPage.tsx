@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { appPath } from '../paths'
 import { OrderLayout, StickyCommerceBar } from '../components/layout'
 import { useCart } from '../context/CartContext'
@@ -7,18 +7,29 @@ import { labelForStatus } from '../data/ops'
 import { formatNaira } from '../data/vendors'
 
 export function CartPage() {
+  const navigate = useNavigate()
   const {
     lines,
     vendor,
     subtotal,
-    deliveryFee,
-    total,
     setQty,
     clear,
     itemCount,
     lastOrder,
   } = useCart()
   const { getVendor } = useCatalog()
+
+  function goBack() {
+    const idx =
+      typeof window.history.state?.idx === 'number'
+        ? window.history.state.idx
+        : 0
+    if (idx > 0) {
+      navigate(-1)
+      return
+    }
+    navigate(appPath())
+  }
 
   if (!itemCount) {
     const lastVendor = lastOrder
@@ -31,7 +42,14 @@ export function CartPage() {
 
     return (
       <OrderLayout>
-        <div className="py-16 text-center">
+        <button
+          type="button"
+          onClick={goBack}
+          className="text-sm font-semibold text-muted hover:text-ink"
+        >
+          ← Back
+        </button>
+        <div className="py-12 text-center">
           <h1 className="font-display text-2xl font-semibold tracking-[-0.03em]">
             Cart is empty
           </h1>
@@ -71,7 +89,15 @@ export function CartPage() {
 
   return (
     <OrderLayout>
-      <div className="flex items-start justify-between gap-3">
+      <button
+        type="button"
+        onClick={goBack}
+        className="text-sm font-semibold text-muted hover:text-ink"
+      >
+        ← Back
+      </button>
+
+      <div className="mt-3 flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-[1.75rem] font-semibold tracking-[-0.03em]">
             Your cart
@@ -132,17 +158,15 @@ export function CartPage() {
           <span className="text-muted">Subtotal</span>
           <span className="font-semibold">{formatNaira(subtotal)}</span>
         </div>
-        <div className="mt-2 flex justify-between text-sm">
-          <span className="text-muted">Delivery</span>
-          <span className="font-semibold">{formatNaira(deliveryFee)}</span>
-        </div>
-        <p className="mt-1.5 text-xs text-muted">
-          Or pick up at the vendor for free at checkout.
-        </p>
         <div className="mt-3 flex justify-between border-t border-line pt-3">
-          <span className="font-bold">Total</span>
-          <span className="font-display text-xl font-semibold">{formatNaira(total)}</span>
+          <span className="font-bold">Items total</span>
+          <span className="font-display text-xl font-semibold">
+            {formatNaira(subtotal)}
+          </span>
         </div>
+        <p className="mt-2 text-xs text-muted">
+          Delivery or free pickup is chosen on the next step.
+        </p>
       </div>
 
       {/* Spacer for sticky bar */}
@@ -154,7 +178,7 @@ export function CartPage() {
           className="flex w-full items-center justify-between gap-3 rounded-xl bg-mango px-4 py-3.5 text-ink"
         >
           <span className="text-sm font-bold">Checkout</span>
-          <span className="text-sm font-bold">{formatNaira(total)}</span>
+          <span className="text-sm font-bold">{formatNaira(subtotal)}</span>
         </Link>
       </StickyCommerceBar>
     </OrderLayout>

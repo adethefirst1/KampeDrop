@@ -347,7 +347,7 @@ export function GuaranteePill({ compact = false }: { compact?: boolean }) {
 }
 
 export function BottomCartBar() {
-  const { itemCount, total, vendor } = useCart()
+  const { itemCount, subtotal, vendor } = useCart()
   const location = useLocation()
   const reduce = useReducedMotion()
   const path = location.pathname
@@ -383,12 +383,12 @@ export function BottomCartBar() {
                 </p>
               </div>
               <motion.span
-                key={total}
+                key={subtotal}
                 initial={reduce ? false : { scale: 0.9, opacity: 0.5 }}
                 animate={{ scale: 1, opacity: 1 }}
                 className="shrink-0 text-sm font-bold"
               >
-                {formatNaira(total)}
+                {formatNaira(subtotal)}
               </motion.span>
             </Link>
           </motion.div>

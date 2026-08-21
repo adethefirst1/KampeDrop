@@ -78,14 +78,6 @@ export function CheckoutPage() {
       setSubmitError('Enter an 11-digit phone number.')
       return
     }
-    if (payment === 'cod') {
-      setSubmitError(
-        pickup
-          ? 'Pay at pickup is for KampeDrop accounts. Choose card or bank transfer.'
-          : 'Cash on delivery is for KampeDrop accounts. Choose card or bank transfer.',
-      )
-      return
-    }
     if (payment === 'card' || payment === 'transfer') {
       const trimmedEmail = email.trim()
       if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
@@ -278,7 +270,8 @@ export function CheckoutPage() {
               {vendor?.pickupSpot || vendor?.area}
             </p>
             <p className="mt-2 text-xs text-muted">
-              We’ll text when it’s ready. Bring your passkey to collect.
+              Follow readiness on Track. Need a hand? WhatsApp support — bring
+              your passkey when you collect.
             </p>
           </div>
         ) : (
@@ -340,8 +333,10 @@ export function CheckoutPage() {
                 {
                   id: 'cod' as const,
                   title: pickup ? 'Pay at pickup' : 'Cash on delivery',
-                  hint: 'Available with a KampeDrop account',
-                  locked: true,
+                  hint: pickup
+                    ? 'Pay the vendor when you collect'
+                    : 'Pay the rider when it arrives',
+                  locked: false,
                 },
               ] as const
             ).map((opt, index) => {
@@ -415,20 +410,26 @@ export function CheckoutPage() {
                       <p className="text-xs leading-relaxed text-muted">
                         {opt.id === 'transfer'
                           ? 'Paystack shows a one-time account for this amount. Escrow still releases only at the handoff passkey.'
-                          : 'You’ll pay securely on Paystack. Escrow still releases only at the handoff passkey.'}
+                          : opt.id === 'card'
+                            ? 'You’ll pay securely on Paystack. Escrow still releases only at the handoff passkey.'
+                            : pickup
+                              ? 'No advance payment. Pay at the vendor when you collect with your passkey.'
+                              : 'No advance payment. Pay the rider in cash when your order arrives.'}
                       </p>
-                      <Field label="Email for receipt" htmlFor="email">
-                        <input
-                          id="email"
-                          type="email"
-                          autoComplete="email"
-                          required
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="you@email.com"
-                          className="field"
-                        />
-                      </Field>
+                      {(opt.id === 'card' || opt.id === 'transfer') && (
+                        <Field label="Email for receipt" htmlFor="email">
+                          <input
+                            id="email"
+                            type="email"
+                            autoComplete="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="you@email.com"
+                            className="field"
+                          />
+                        </Field>
+                      )}
                     </div>
                   )}
                 </div>
@@ -463,7 +464,9 @@ export function CheckoutPage() {
           className="flex w-full items-center justify-center rounded-xl bg-mango px-4 py-3.5 text-sm font-bold text-ink disabled:opacity-70"
         >
           {submitting
-            ? 'Opening Paystack…'
+            ? payment === 'card' || payment === 'transfer'
+              ? 'Opening Paystack…'
+              : 'Placing order…'
             : payment === 'card' || payment === 'transfer'
               ? 'Continue to Paystack'
               : pickup

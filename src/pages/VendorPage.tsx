@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useState } from 'react'
 import { appPath } from '../paths'
 import { AnimatePresence, motion } from 'motion/react'
@@ -12,11 +12,24 @@ import { fadeUp, springSnap, tapPress } from '../motion/tokens'
 
 export function VendorPage() {
   const { vendorId } = useParams()
+  const navigate = useNavigate()
   const { getVendor } = useCatalog()
   const vendor = getVendor(vendorId ?? '')
   const { addItem, setQty, lines } = useCart()
   const [toast, setToast] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
+
+  function goBack() {
+    const idx =
+      typeof window.history.state?.idx === 'number'
+        ? window.history.state.idx
+        : 0
+    if (idx > 0) {
+      navigate(-1)
+      return
+    }
+    navigate(appPath())
+  }
 
   if (!vendor || !isBuyerVisible(vendor)) {
     return (
@@ -55,9 +68,13 @@ export function VendorPage() {
 
   return (
     <AppShell showInstallTip={false}>
-      <Link to={appPath()} className="text-sm font-semibold text-muted hover:text-ink">
-        ← Vendors
-      </Link>
+      <button
+        type="button"
+        onClick={goBack}
+        className="text-sm font-semibold text-muted hover:text-ink"
+      >
+        ← Back
+      </button>
 
       <div className="mt-3 flex items-start gap-3">
         <span

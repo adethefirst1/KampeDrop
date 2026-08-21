@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { APP_BASE, isStandaloneDisplay } from '../paths'
@@ -218,9 +219,24 @@ export function AppGuideSheet({
     mode === 'install' ? 'install' : 'choose',
   )
 
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   useEffect(() => {
     if (open) setView(mode === 'install' ? 'install' : 'choose')
   }, [open, mode])
+
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open])
 
   async function runNativeInstall() {
     if (!deferred) {
@@ -239,36 +255,42 @@ export function AppGuideSheet({
     }
   }
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[80] flex items-end justify-center bg-ink/60 p-3 sm:items-center sm:p-4"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/60 px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
           <motion.div
-            className="max-h-[90svh] w-full max-w-md overflow-y-auto rounded-[1.75rem] bg-paper p-5 text-ink shadow-2xl sm:p-6"
-            initial={{ y: 48, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 24, opacity: 0 }}
+            className="flex w-full max-w-md max-h-[min(88dvh,36rem)] flex-col overflow-hidden rounded-[1.75rem] bg-paper text-ink shadow-2xl"
+            initial={{ y: 28, opacity: 0, scale: 0.98 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 16, opacity: 0, scale: 0.98 }}
             transition={springSoft}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-labelledby="app-guide-title"
           >
-            <div className="flex items-start gap-3">
-              <img src="/icons/icon-192.png" alt="" className="h-12 w-12 rounded-2xl" />
+            <div className="flex shrink-0 items-start gap-3 border-b border-line/60 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
+              <img
+                src="/icons/icon-192.png"
+                alt=""
+                className="h-11 w-11 shrink-0 rounded-2xl sm:h-12 sm:w-12"
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-lagoon">
                   KampeDrop app
                 </p>
                 <h2
                   id="app-guide-title"
-                  className="mt-1 font-display text-2xl font-semibold tracking-[-0.02em]"
+                  className="mt-1 font-display text-[1.35rem] font-semibold leading-tight tracking-[-0.02em] sm:text-2xl"
                 >
                   {view === 'choose' ? 'How do you want to continue?' : guide.title}
                 </h2>
@@ -276,122 +298,126 @@ export function AppGuideSheet({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-full bg-mist px-2.5 py-1 text-sm font-bold text-muted"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-mist text-sm font-bold text-muted"
                 aria-label="Close"
               >
                 ✕
               </button>
             </div>
 
-            {view === 'choose' ? (
-              <div className="mt-5 space-y-3">
-                <p className="text-sm leading-relaxed text-muted">
-                  You can order in your browser right now, or install KampeDrop so it sits on your
-                  home screen like a normal app.
-                </p>
-
-                <Link
-                  to={APP_BASE}
-                  onClick={onClose}
-                  className="btn-primary flex w-full shadow-[0_10px_28px_rgba(255,107,44,0.25)]"
-                >
-                  Continue in browser
-                </Link>
-
-                {!installed && (
-                  <button
-                    type="button"
-                    className="btn-ink w-full"
-                    onClick={() => {
-                      if (deferred) void runNativeInstall()
-                      else setView('install')
-                    }}
-                  >
-                    {deferred ? 'Install app' : 'Show install steps'}
-                  </button>
-                )}
-
-                <div className="rounded-2xl bg-mist px-4 py-3 text-sm text-ink-soft">
-                  <p className="font-semibold text-ink">Tip</p>
-                  <p className="mt-1 leading-relaxed">
-                    Installing is free and takes under a minute. No App Store download needed.
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
+              {view === 'choose' ? (
+                <div className="space-y-3">
+                  <p className="text-sm leading-relaxed text-muted">
+                    You can order in your browser right now, or install KampeDrop so it sits
+                    on your home screen like a normal app.
                   </p>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-5 space-y-4">
-                <p className="text-sm leading-relaxed text-muted">
-                  Follow these steps on your device. When you’re done, open the KampeDrop icon —
-                  it goes straight to ordering.
-                </p>
 
-                <ol className="space-y-3">
-                  {guide.items.map((item, i) => (
-                    <li
-                      key={item}
-                      className="flex gap-3 rounded-2xl bg-mist px-3.5 py-3 text-sm leading-relaxed text-ink-soft"
-                    >
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-white">
-                        {i + 1}
-                      </span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ol>
-
-                {platform === 'android' && deferred && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void runNativeInstall()}
-                    className="btn-primary w-full disabled:opacity-70"
-                  >
-                    {busy ? 'Opening install…' : 'Install now'}
-                  </button>
-                )}
-
-                {platform === 'desktop' && deferred && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void runNativeInstall()}
-                    className="btn-primary w-full disabled:opacity-70"
-                  >
-                    {busy ? 'Opening install…' : 'Install now'}
-                  </button>
-                )}
-
-                {platform === 'ios' && (
-                  <div className="rounded-2xl border border-lagoon/20 bg-lagoon/8 px-4 py-3 text-sm text-lagoon-deep">
-                    Must use <span className="font-bold">Safari</span>. In-app browsers (WhatsApp,
-                    Instagram) often hide the Share → Add to Home Screen option.
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  {mode === 'entry' && (
-                    <button
-                      type="button"
-                      className="btn-ink flex-1"
-                      onClick={() => setView('choose')}
-                    >
-                      Back
-                    </button>
-                  )}
                   <Link
                     to={APP_BASE}
                     onClick={onClose}
-                    className="btn-primary flex flex-1 items-center justify-center"
+                    className="btn-primary flex w-full shadow-[0_10px_28px_rgba(255,107,44,0.25)]"
                   >
-                    Order in browser instead
+                    Continue in browser
                   </Link>
+
+                  {!installed && (
+                    <button
+                      type="button"
+                      className="btn-ink w-full"
+                      onClick={() => {
+                        if (deferred) void runNativeInstall()
+                        else setView('install')
+                      }}
+                    >
+                      {deferred ? 'Install app' : 'Show install steps'}
+                    </button>
+                  )}
+
+                  <div className="rounded-2xl bg-mist px-4 py-3 text-sm text-ink-soft">
+                    <p className="font-semibold text-ink">Tip</p>
+                    <p className="mt-1 leading-relaxed">
+                      Installing is free and takes under a minute. No App Store download
+                      needed.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm leading-relaxed text-muted">
+                    Follow these steps on your device. When you’re done, open the KampeDrop
+                    icon — it goes straight to ordering.
+                  </p>
+
+                  <ol className="space-y-3">
+                    {guide.items.map((item, i) => (
+                      <li
+                        key={item}
+                        className="flex gap-3 rounded-2xl bg-mist px-3.5 py-3 text-sm leading-relaxed text-ink-soft"
+                      >
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-white">
+                          {i + 1}
+                        </span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ol>
+
+                  {platform === 'android' && deferred && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void runNativeInstall()}
+                      className="btn-primary w-full disabled:opacity-70"
+                    >
+                      {busy ? 'Opening install…' : 'Install now'}
+                    </button>
+                  )}
+
+                  {platform === 'desktop' && deferred && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void runNativeInstall()}
+                      className="btn-primary w-full disabled:opacity-70"
+                    >
+                      {busy ? 'Opening install…' : 'Install now'}
+                    </button>
+                  )}
+
+                  {platform === 'ios' && (
+                    <div className="rounded-2xl border border-lagoon/20 bg-lagoon/8 px-4 py-3 text-sm text-lagoon-deep">
+                      Must use <span className="font-bold">Safari</span>. In-app browsers
+                      (WhatsApp, Instagram) often hide the Share → Add to Home Screen option.
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    {mode === 'entry' && (
+                      <button
+                        type="button"
+                        className="btn-ink flex-1"
+                        onClick={() => setView('choose')}
+                      >
+                        Back
+                      </button>
+                    )}
+                    <Link
+                      to={APP_BASE}
+                      onClick={onClose}
+                      className="btn-primary flex flex-1 items-center justify-center"
+                    >
+                      Order in browser instead
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 

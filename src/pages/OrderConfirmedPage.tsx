@@ -31,7 +31,7 @@ const tones: Record<Category, ConfirmTone> = {
     headline: 'Kitchen’s on it.',
     support: (first, vendor, pickup) =>
       pickup
-        ? `${first}, ${vendor} is preparing your plate. We’ll ping you when it’s ready to collect.`
+        ? `${first}, ${vendor} is preparing your plate. Follow Track for ready — WhatsApp support if you need a hand.`
         : `${first}, ${vendor} is firing up your order — lagoon heat, headed your way.`,
     nextHint: (payment, pickup) =>
       payment === 'transfer'

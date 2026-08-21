@@ -61,6 +61,16 @@ const moods: Record<Category, Mood> = {
     accentSoft: 'rgba(42, 92, 56, 0.12)',
     stamp: 'PAID · HELD',
   },
+  pharmacy: {
+    eyebrow: 'Care slip',
+    headline: 'Sealed & set',
+    sub: 'Pharmacy order locked in — careful handoff ahead.',
+    paper: '#f4f9fb',
+    ink: '#0f2a32',
+    accent: '#0c6560',
+    accentSoft: 'rgba(12, 101, 96, 0.12)',
+    stamp: 'PAID · HELD',
+  },
   store: {
     eyebrow: 'Store slip',
     headline: 'All set',

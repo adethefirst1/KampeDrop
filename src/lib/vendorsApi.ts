@@ -1,5 +1,7 @@
 import { getSupabase, isSupabaseConfigured } from './supabase'
 import type { Category, MenuItem, VerificationStatus, Vendor } from '../data/vendors'
+import { migrateStatus } from '../data/ops'
+import type { OrderStatus } from '../context/CartContext'
 
 export type SubmitVendorApplicationInput = {
   name: string
@@ -156,7 +158,7 @@ export type VendorPortalOrder = {
   note: string
   payment: 'cod' | 'transfer' | 'card'
   fulfillment: 'delivery' | 'pickup'
-  status: string
+  status: OrderStatus
   passkey: string
   escrowState: string
   deliveryFee: number
@@ -176,7 +178,7 @@ export type VendorPortalOrder = {
 
 function rowToVendorPortalOrder(row: Record<string, unknown>): VendorPortalOrder {
   const fulfillment = row.fulfillment === 'pickup' ? 'pickup' : 'delivery'
-  const status = String(row.status ?? '')
+  const status = migrateStatus(String(row.status ?? ''))
   const payment =
     row.payment === 'transfer' ? 'transfer' : row.payment === 'card' ? 'card' : 'cod'
   return {

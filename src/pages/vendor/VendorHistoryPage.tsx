@@ -84,13 +84,14 @@ function HistoryOrderSheet({
   if (!order) return null
 
   const pickup = order.fulfillment === 'pickup'
+  const orderId = order.id
 
   async function onShare() {
     if (!receiptRef.current) return
     setSharing(true)
     setShareError(null)
     try {
-      await shareReceiptPng(receiptRef.current, order.id)
+      await shareReceiptPng(receiptRef.current, orderId)
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         /* user cancelled share sheet */

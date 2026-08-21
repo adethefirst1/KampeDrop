@@ -607,7 +607,11 @@ export function vendorRowToVendor(
   items: MenuItem[] = [],
 ): Vendor {
   const category = (
-    row.category === 'mart' || row.category === 'pharmacy' ? row.category : 'food'
+    row.category === 'mart' ||
+    row.category === 'pharmacy' ||
+    row.category === 'store'
+      ? row.category
+      : 'food'
   ) as Category
   const about = row.about?.trim() || ''
   const pickupFromAbout = about.match(/Pickup \/ landmark:\s*(.+)/i)?.[1]?.trim()

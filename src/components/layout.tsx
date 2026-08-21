@@ -437,6 +437,7 @@ export function AppShell({
   narrow = false,
   showInstallTip,
   bleed = false,
+  wash = 'mist',
 }: {
   children: ReactNode
   narrow?: boolean
@@ -444,19 +445,23 @@ export function AppShell({
   showInstallTip?: boolean
   /** Edge-to-edge main (no mist wash / container) — confirmation moments */
   bleed?: boolean
+  /** Page atmosphere */
+  wash?: 'mist' | 'shop'
 }) {
   const { pathname } = useLocation()
   const tip =
     showInstallTip ?? (pathname === APP_BASE || pathname === `${APP_BASE}/`)
 
+  const washClass = bleed ? 'bg-ink' : wash === 'shop' ? 'shop-wash' : 'mist-wash'
+
   return (
-    <div className={`min-h-svh text-ink ${bleed ? 'bg-ink' : 'mist-wash'}`}>
+    <div className={`relative min-h-svh text-ink ${washClass}`}>
       <AppHeader />
       <main
         className={
           bleed
             ? 'min-h-[calc(100svh-3.5rem)] p-0'
-            : `min-h-[70svh] pb-28 pt-4 ${
+            : `relative min-h-[70svh] pb-28 pt-4 ${
                 narrow ? 'container-narrow' : 'mx-auto max-w-lg px-4 md:max-w-3xl'
               }`
         }

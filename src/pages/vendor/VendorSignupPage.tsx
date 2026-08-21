@@ -53,6 +53,7 @@ const CATEGORY_CARDS: { id: Category; hint: string }[] = [
   { id: 'food', hint: 'Kitchen, grill, swallow, pepper soup' },
   { id: 'mart', hint: 'Staples, household, everyday stock' },
   { id: 'pharmacy', hint: 'OTC, sealed packs, careful handoff' },
+  { id: 'store', hint: 'Corner shop, airtime, small runs' },
 ]
 
 const PHOTO_SLOTS = [

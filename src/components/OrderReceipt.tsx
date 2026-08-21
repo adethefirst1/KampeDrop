@@ -54,21 +54,21 @@ const moods: Record<Category, Mood> = {
   mart: {
     eyebrow: 'Basket slip',
     headline: 'All stocked',
-    sub: 'Groceries on the move — home’s almost fuller.',
+    sub: 'Mall run locked in — home’s almost fuller.',
     paper: '#f3faf6',
     ink: '#143028',
     accent: '#2a5c38',
     accentSoft: 'rgba(42, 92, 56, 0.12)',
     stamp: 'PAID · HELD',
   },
-  pharmacy: {
-    eyebrow: 'Care note',
-    headline: 'Take care',
-    sub: 'Sealed & sorted — feeling better starts here.',
-    paper: '#f4f9fb',
-    ink: '#0f2a32',
-    accent: '#0c6560',
-    accentSoft: 'rgba(12, 101, 96, 0.12)',
+  store: {
+    eyebrow: 'Store slip',
+    headline: 'All set',
+    sub: 'Neighbourhood haul locked in — small shop, solid handoff.',
+    paper: '#f7f5fc',
+    ink: '#1f1833',
+    accent: '#5b4a9a',
+    accentSoft: 'rgba(91, 74, 154, 0.12)',
     stamp: 'PAID · HELD',
   },
 }
@@ -190,6 +190,51 @@ function ReceiptDoodles({
             d="M22 8c-2 6-8 10-8 16 0 4 3 8 8 8s8-4 8-8c0-6-6-10-8-16Z"
             fill="currentColor"
             opacity="0.7"
+          />
+        </motion.svg>
+      </>
+    )
+  }
+
+  if (category === 'store') {
+    return (
+      <>
+        <motion.svg
+          className="pointer-events-none absolute right-3 top-9 h-14 w-14 opacity-[0.2]"
+          viewBox="0 0 56 56"
+          fill="none"
+          animate={reduce ? undefined : { y: [0, -3, 0] }}
+          transition={float}
+          aria-hidden
+        >
+          <path
+            d="M8 22h40l-2.5 22H10.5L8 22Z"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M12 22V16l4-6h24l4 6v6"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+          />
+          <path d="M24 44V32h8v12" stroke="currentColor" strokeWidth="2.5" />
+        </motion.svg>
+        <motion.svg
+          className="pointer-events-none absolute left-2 bottom-24 h-10 w-10 opacity-[0.16]"
+          viewBox="0 0 40 40"
+          fill="none"
+          animate={reduce ? undefined : { rotate: [0, -5, 0] }}
+          transition={float}
+          aria-hidden
+        >
+          <circle cx="20" cy="20" r="12" stroke="currentColor" strokeWidth="2.5" />
+          <path
+            d="M14 20h12M20 14v12"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
           />
         </motion.svg>
       </>

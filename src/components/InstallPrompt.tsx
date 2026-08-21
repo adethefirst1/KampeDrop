@@ -417,18 +417,17 @@ export function InAppInstallTip() {
 
   return (
     <>
-      <div className="mb-4 rounded-2xl border border-lagoon/20 bg-lagoon/8 px-4 py-3">
-        <p className="text-sm font-semibold text-lagoon-deep">Using KampeDrop in your browser</p>
-        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          Want the home-screen icon? We’ll walk you through install in a few taps.
+      <div className="mb-5 flex items-center justify-between gap-3 rounded-full border border-lagoon/15 bg-paper/70 px-3.5 py-2 backdrop-blur-sm">
+        <p className="min-w-0 truncate text-xs font-semibold text-ink-soft">
+          Want the home-screen icon?
         </p>
-        <div className="mt-3 flex gap-2">
+        <div className="flex shrink-0 gap-1">
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="rounded-xl bg-ink px-3 py-2 text-xs font-bold text-white"
+            className="rounded-full bg-ink px-3 py-1.5 text-[11px] font-bold text-white"
           >
-            Show install steps
+            Install
           </button>
           <button
             type="button"
@@ -440,9 +439,9 @@ export function InAppInstallTip() {
                 /* ignore */
               }
             }}
-            className="rounded-xl px-3 py-2 text-xs font-semibold text-muted"
+            className="rounded-full px-2.5 py-1.5 text-[11px] font-semibold text-muted"
           >
-            Not now
+            Later
           </button>
         </div>
       </div>

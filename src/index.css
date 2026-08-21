@@ -190,6 +190,14 @@
       var(--color-mist);
   }
 
+  .shop-wash {
+    background:
+      radial-gradient(ellipse 100% 70% at 0% -5%, rgba(255, 244, 235, 0.95), transparent 52%),
+      radial-gradient(ellipse 80% 55% at 100% 0%, rgba(230, 240, 238, 0.9), transparent 50%),
+      radial-gradient(ellipse 60% 45% at 50% 100%, rgba(12, 101, 96, 0.08), transparent 55%),
+      linear-gradient(180deg, #f7f1e8 0%, var(--color-mist) 42%, #e8f0ee 100%);
+  }
+
   .wave-line {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 48' fill='none'%3E%3Cpath d='M0 24c160 18 320-18 480 0s320 18 480 0 320-18 480 0v24H0V24z' fill='%230c6560' fill-opacity='0.1'/%3E%3C/svg%3E");
     background-repeat: repeat-x;

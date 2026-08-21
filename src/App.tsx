@@ -13,6 +13,7 @@ import { OpsProvider } from './context/OpsContext'
 import { VendorProvider } from './context/VendorContext'
 import { HomePage } from './pages/HomePage'
 import { BrowsePage } from './pages/BrowsePage'
+import { CategoryPage } from './pages/CategoryPage'
 import { VendorPage } from './pages/VendorPage'
 import { CartPage } from './pages/CartPage'
 import { CheckoutPage } from './pages/CheckoutPage'
@@ -92,6 +93,7 @@ function AppRoutes() {
         </Route>
 
         <Route path={APP_BASE} element={<BrowsePage />} />
+        <Route path={`${APP_BASE}/category/:categoryId`} element={<CategoryPage />} />
         <Route path={`${APP_BASE}/vendors/:vendorId`} element={<VendorPage />} />
         <Route path={`${APP_BASE}/cart`} element={<CartPage />} />
         <Route path={`${APP_BASE}/checkout`} element={<CheckoutPage />} />

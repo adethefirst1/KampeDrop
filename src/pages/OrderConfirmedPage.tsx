@@ -87,7 +87,7 @@ const tones: Record<Category, ConfirmTone> = {
         : payment === 'card'
           ? 'Next: complete Paystack card payment. Escrow releases at handoff passkey.'
           : pickup
-            ? 'Pay at the mart when you collect.'
+            ? 'Pay at the mall when you collect.'
             : 'Pay the rider at your door. Essentials, tracked.',
     shell: 'bg-ink text-white',
     wash: 'from-[#0a2a24] via-ink to-[#06181c]',
@@ -96,6 +96,29 @@ const tones: Record<Category, ConfirmTone> = {
     cta: 'Track my order',
     ctaClass: 'bg-dusk text-ink hover:brightness-105',
     accentBlob: 'bg-palm/45',
+  },
+  store: {
+    eyebrow: 'Order locked',
+    headline: 'Corner’s got you.',
+    support: (first, vendor, pickup) =>
+      pickup
+        ? `${first}, ${vendor} is packing your bits. Collect with your passkey when ready.`
+        : `${first}, ${vendor} is packing your run — neighbourhood speed, tracked handoff.`,
+    nextHint: (payment, pickup) =>
+      payment === 'transfer'
+        ? 'Next: Paystack shows a one-time account — held until vendor handoff.'
+        : payment === 'card'
+          ? 'Next: complete Paystack card payment. Escrow releases at handoff passkey.'
+          : pickup
+            ? 'Pay at the store when you collect.'
+            : 'Pay the rider at your door. Small shop, clear tracking.',
+    shell: 'bg-[#1f1833] text-[#f7f5fc]',
+    wash: 'from-[#3d3266] via-[#1f1833] to-[#0f2e34]',
+    ink: 'text-[#f7f5fc]',
+    muted: 'text-[#d4cce8]/70',
+    cta: 'Track my order',
+    ctaClass: 'bg-[#c4b5fd] text-[#1f1833] hover:brightness-105',
+    accentBlob: 'bg-[#5b4a9a]/45',
   },
 }
 

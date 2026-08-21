@@ -29,7 +29,7 @@ begin
   select o.*
   from public.orders o
   where o.vendor_id = v_vendor.id::text
-    and o.status in ('delivered', 'cancelled')
+    and o.status = 'delivered'
   order by o.created_at desc;
 end;
 $$;
@@ -38,4 +38,4 @@ revoke all on function public.get_vendor_order_history(text) from public;
 grant execute on function public.get_vendor_order_history(text) to anon, authenticated;
 
 comment on function public.get_vendor_order_history(text) is
-  'Vendor portal: delivered + cancelled orders for the vendor identified by access_token (newest first).';
+  'Vendor portal: successful (delivered/collected) orders for the vendor identified by access_token (newest first).';

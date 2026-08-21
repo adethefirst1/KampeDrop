@@ -1,4 +1,4 @@
-export type Category = 'food' | 'mart' | 'pharmacy'
+export type Category = 'food' | 'mart' | 'pharmacy' | 'store'
 
 export type VerificationStatus =
   | 'draft'
@@ -64,11 +64,7 @@ export const VENDOR_DEMO_PIN = '1234'
 export const MIN_ONBOARDING_PHOTOS = 2
 export const MAX_ONBOARDING_PHOTOS = 4
 
-export const categoryLabel: Record<Category, string> = {
-  food: 'Food',
-  mart: 'Mart',
-  pharmacy: 'Pharmacy',
-}
+export { categoryLabel } from './categories'
 
 export const verificationLabel: Record<VerificationStatus, string> = {
   draft: 'Draft',
@@ -311,6 +307,62 @@ export const seedVendors: Vendor[] = [
         name: 'Zobo (1L)',
         description: 'Chilled hibiscus — Badagry evening drink.',
         price: 1000,
+      },
+    ],
+  },
+  {
+    id: 'mowo-corner-store',
+    name: 'Mowo Corner Store',
+    category: 'store',
+    area: 'Mowo',
+    pickupSpot: 'Mowo bus stop — blue kiosk, ask for Tunde',
+    tagline: 'Phone credit, snacks, and the little things you forgot on the way home.',
+    about:
+      'Neighbourhood counter by the bus stop. Fast pack for riders — no long queues.',
+    etaMins: 25,
+    rating: 4.7,
+    orders: '40+',
+    accent: '#5b4a9a',
+    vettedNote: 'Walk-in verified. Clean counter, clear prices.',
+    phone: '08034441005',
+    hours: 'Daily · 7:00 – 22:00',
+    lat: 6.439,
+    lng: 2.901,
+    photos: [
+      'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&w=800&q=80',
+    ],
+    acceptingOrders: true,
+    active: true,
+    verificationStatus: 'approved',
+    submittedAt: null,
+    reviewNote: null,
+    accessPin: VENDOR_DEMO_PIN,
+    items: [
+      {
+        id: 'airtime',
+        name: 'Airtime ₦1,000',
+        description: 'MTN / Airtel / Glo — tell us the number in the note.',
+        price: 1000,
+        popular: true,
+      },
+      {
+        id: 'peak-milk',
+        name: 'Peak Milk (tin)',
+        description: 'Sealed tin — expiry checked.',
+        price: 1800,
+      },
+      {
+        id: 'biscuit-pack',
+        name: 'Family Biscuit Pack',
+        description: 'Assorted — good for the road.',
+        price: 1200,
+        popular: true,
+      },
+      {
+        id: 'candle-pack',
+        name: 'Candles (pack of 6)',
+        description: 'For NEPA nights.',
+        price: 900,
       },
     ],
   },

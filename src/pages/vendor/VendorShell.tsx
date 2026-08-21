@@ -39,6 +39,7 @@ export function VendorShell() {
 
   const tabs = [
     { to: vendorPath(), label: 'Orders', end: true },
+    { to: vendorPath('/history'), label: 'History', end: false },
     { to: vendorPath('/menu'), label: 'Menu', end: false },
     { to: vendorPath('/profile'), label: 'Business', end: false },
   ]

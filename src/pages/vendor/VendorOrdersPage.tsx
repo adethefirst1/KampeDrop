@@ -35,6 +35,11 @@ export function VendorOrdersPage() {
           <p className="mt-1 text-sm text-muted">
             Start preparing → ready (pickup) → confirm handoff with the buyer passkey.
           </p>
+          <p className="mt-2 text-xs font-semibold">
+            <Link to={vendorPath('/history')} className="text-lagoon hover:underline">
+              View order history →
+            </Link>
+          </p>
         </div>
         <button
           type="button"

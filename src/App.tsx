@@ -29,6 +29,7 @@ import {
 import { VendorLoginPage } from './pages/vendor/VendorLoginPage'
 import { VendorSignupPage } from './pages/vendor/VendorSignupPage'
 import { VendorOrdersPage } from './pages/vendor/VendorOrdersPage'
+import { VendorHistoryPage } from './pages/vendor/VendorHistoryPage'
 import { VendorOrderDetailPage } from './pages/vendor/VendorOrderDetailPage'
 import { VendorMenuPage } from './pages/vendor/VendorMenuPage'
 import { VendorProfilePage } from './pages/vendor/VendorProfilePage'
@@ -84,6 +85,7 @@ function AppRoutes() {
           }
         >
           <Route index element={<VendorOrdersPage />} />
+          <Route path="history" element={<VendorHistoryPage />} />
           <Route path="orders/:orderId" element={<VendorOrderDetailPage />} />
           <Route path="menu" element={<VendorMenuPage />} />
           <Route path="profile" element={<VendorProfilePage />} />

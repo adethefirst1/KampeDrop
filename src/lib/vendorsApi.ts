@@ -230,6 +230,29 @@ export async function getVendorOrders(
   }
 }
 
+/** Vendor portal: delivered + cancelled orders (newest first). */
+export async function getVendorOrderHistory(
+  accessToken: string,
+): Promise<{ ok: true; orders: VendorPortalOrder[] } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase.rpc('get_vendor_order_history', {
+    p_token: accessToken,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+
+  const rows = Array.isArray(data) ? data : data ? [data] : []
+  return {
+    ok: true,
+    orders: rows.map((r) => rowToVendorPortalOrder(r as Record<string, unknown>)),
+  }
+}
+
 /** Vendor portal: preparing | ready_for_pickup only. */
 export async function updateOrderStatusByVendor(
   accessToken: string,

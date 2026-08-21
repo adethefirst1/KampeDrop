@@ -140,7 +140,7 @@ export function PlacePicker({ value, onChange }: Props) {
           ? googleReady
             ? 'Google Places + Badagry landmarks'
             : 'Loading Google Places…'
-          : 'Badagry landmarks (add VITE_GOOGLE_MAPS_API_KEY for Google search)'}
+          : 'Search your street, or pick a nearby landmark below'}
       </p>
 
       {locError && (
@@ -167,7 +167,16 @@ export function PlacePicker({ value, onChange }: Props) {
       )}
 
       {!value && (
-        <ul className="max-h-56 space-y-1.5 overflow-y-auto rounded-2xl bg-paper p-2 ring-1 ring-line">
+        <ul
+          className="max-h-56 space-y-1.5 overflow-y-auto rounded-2xl bg-paper p-2 ring-1 ring-line"
+          style={{
+            // Extra scroll room so the last rows clear the measured sticky bar.
+            paddingBottom:
+              'max(0.5rem, var(--sticky-commerce-bar-height, 7.5rem))',
+            scrollPaddingBottom:
+              'var(--sticky-commerce-bar-height, 7.5rem)',
+          }}
+        >
           {googleSuggestions.map((s) => (
             <li key={s.placeId}>
               <button

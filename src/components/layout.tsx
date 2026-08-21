@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useCart } from '../context/CartContext'
@@ -400,12 +400,57 @@ export function BottomCartBar() {
 
 /** Sticky primary CTA for cart / checkout (replaces bottom cart bar on those screens) */
 export function StickyCommerceBar({ children }: { children: ReactNode }) {
+  const shellRef = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState(0)
+
+  useLayoutEffect(() => {
+    const shell = shellRef.current
+    if (!shell) return
+
+    const publish = (next: number) => {
+      setHeight(next)
+      document.documentElement.style.setProperty(
+        '--sticky-commerce-bar-height',
+        `${next}px`,
+      )
+    }
+
+    const measure = () => {
+      // Outer fixed wrapper includes bottom safe-area padding.
+      const outer = shell.parentElement
+      const h = outer?.getBoundingClientRect().height ?? shell.getBoundingClientRect().height
+      publish(Math.ceil(h))
+    }
+
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(shell)
+    if (shell.parentElement) ro.observe(shell.parentElement)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+      document.documentElement.style.removeProperty('--sticky-commerce-bar-height')
+    }
+  }, [])
+
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6">
-      <div className="pointer-events-auto mx-auto max-w-xl rounded-2xl bg-ink p-3 shadow-[0_12px_40px_rgba(14,28,24,0.35)]">
-        {children}
+    <>
+      {/* In-flow spacer matches the real fixed bar so page content clears it */}
+      <div
+        aria-hidden
+        className="pointer-events-none shrink-0"
+        style={{ height: height > 0 ? height : '7.5rem' }}
+      />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-6">
+        <div
+          ref={shellRef}
+          className="pointer-events-auto mx-auto max-w-xl rounded-2xl bg-ink p-3 shadow-[0_12px_40px_rgba(14,28,24,0.35)]"
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 

@@ -446,8 +446,6 @@ export function CheckoutPage() {
             {submitError}
           </p>
         )}
-
-        <div className="h-28" aria-hidden />
       </form>
 
       <StickyCommerceBar>

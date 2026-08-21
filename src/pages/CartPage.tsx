@@ -169,9 +169,7 @@ export function CartPage() {
         </p>
       </div>
 
-      {/* Spacer for sticky bar */}
-      <div className="h-24" aria-hidden />
-
+      {/* StickyCommerceBar provides measured in-flow spacer */}
       <StickyCommerceBar>
         <Link
           to={appPath('/checkout')}

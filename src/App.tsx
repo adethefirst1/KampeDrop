@@ -17,6 +17,7 @@ import { CategoryPage } from './pages/CategoryPage'
 import { VendorPage } from './pages/VendorPage'
 import { CartPage } from './pages/CartPage'
 import { CheckoutPage } from './pages/CheckoutPage'
+import { FindOrderPage } from './pages/FindOrderPage'
 import { OrderConfirmedPage } from './pages/OrderConfirmedPage'
 import { TrackPage } from './pages/TrackPage'
 import { HowPage } from './pages/HowPage'
@@ -97,6 +98,7 @@ function AppRoutes() {
         <Route path={`${APP_BASE}/vendors/:vendorId`} element={<VendorPage />} />
         <Route path={`${APP_BASE}/cart`} element={<CartPage />} />
         <Route path={`${APP_BASE}/checkout`} element={<CheckoutPage />} />
+        <Route path={`${APP_BASE}/find-order`} element={<FindOrderPage />} />
         <Route
           path={`${APP_BASE}/orders/:orderId/confirmed`}
           element={<OrderConfirmedPage />}

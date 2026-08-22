@@ -3,7 +3,7 @@ import { appPath } from '../paths'
 import { MarketingLayout } from '../components/layout'
 import { SITE, whatsappHelpUrl } from '../data/site'
 
-const LAST_UPDATED = '17 August 2026'
+const LAST_UPDATED = '22 August 2026'
 
 export function TermsPage() {
   return (
@@ -44,33 +44,45 @@ export function TermsPage() {
               preference) to fulfil an order.
             </p>
             <p className="mt-4">
-              We’ll send order confirmations and status updates to the phone number you provide.
+              After you place an order, you can follow status on your{' '}
+              <span className="font-semibold text-ink">Track</span> page (keep the link, or
+              recover it later with your order ID and checkout phone). For help, contact us on
+              WhatsApp or phone — we do not send automated SMS updates yet.
             </p>
           </Section>
 
           <Section title="3. How payment works">
-            <p>We currently support two payment methods:</p>
+            <p>We currently support these payment methods at checkout:</p>
             <ul className="mt-4 list-disc space-y-2 pl-5">
               <li>
-                <span className="font-semibold text-ink">Cash on delivery / pay at pickup — </span>
-                pay the rider or vendor directly when your order arrives or is collected.
+                <span className="font-semibold text-ink">Card — </span>
+                pay securely via Paystack (Visa / Mastercard). Funds are held until handoff
+                passkey confirmation (see Escrow).
               </li>
               <li>
                 <span className="font-semibold text-ink">Bank transfer — </span>
-                pay in advance via transfer. Funds are held until your order is confirmed as
-                handed over (see Escrow &amp; the KampeDrop Guarantee). Ops confirms receipt of
-                transfer before your order proceeds with confidence.
+                Paystack shows a one-time account for the order amount. Funds are held until
+                handoff passkey confirmation.
+              </li>
+              <li>
+                <span className="font-semibold text-ink">Cash on delivery / pay at pickup — </span>
+                pay the rider or vendor directly when your order arrives or is collected. No
+                advance payment; these orders are not held in escrow.
               </li>
             </ul>
-            <p className="mt-4">We do not currently store or process card payments directly.</p>
+            <p className="mt-4">
+              Card and transfer payments are processed by Paystack. KampeDrop does not store
+              your full card details.
+            </p>
           </Section>
 
           <Section title="4. Escrow &amp; the KampeDrop Guarantee">
-            <p>
-              For orders paid by transfer, your payment is{' '}
-              <span className="font-semibold text-ink">held</span>, not released to the
-              vendor, until KampeDrop confirms the order left the vendor correctly — either
-              with a vetted rider, or collected by you on pickup.
+            <p className="mt-4">
+              For orders paid by{' '}
+              <span className="font-semibold text-ink">card or bank transfer</span>, your
+              payment is <span className="font-semibold text-ink">held</span>, not released to
+              the vendor, until KampeDrop confirms the order left the vendor correctly —
+              either with a vetted rider, or collected by you on pickup.
             </p>
             <p className="mt-4">
               Confirmation happens through a{' '}

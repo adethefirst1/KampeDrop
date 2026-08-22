@@ -60,6 +60,15 @@ export function CartPage() {
           <Link to={appPath()} className="btn-primary mt-8">
             Browse vendors
           </Link>
+          <p className="mt-4 text-center text-sm text-muted">
+            Already ordered?{' '}
+            <Link
+              to={appPath('/find-order')}
+              className="font-semibold text-lagoon hover:underline"
+            >
+              Find my order
+            </Link>
+          </p>
 
           {lastOrder && (
             <Link

@@ -222,6 +222,12 @@ function AppHeader() {
             </Link>
           )}
           <Link
+            to={appPath('/find-order')}
+            className="text-xs font-semibold text-muted hover:text-ink"
+          >
+            Track
+          </Link>
+          <Link
             to={appPath('/cart')}
             className="relative rounded-full bg-mist px-3 py-2 text-sm font-semibold"
           >

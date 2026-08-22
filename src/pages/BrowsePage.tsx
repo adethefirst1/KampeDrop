@@ -332,7 +332,7 @@ export function BrowsePage() {
             return (
               <MotionItem key={key} as="li" variants={fadeUp}>
                 <MotionLink
-                  to={appPath(`/vendors/${vendor.id}`)}
+                  to={appPath(`/vendors/${vendor.id}?item=${encodeURIComponent(item.id)}`)}
                   className="group relative flex items-center gap-3.5 overflow-hidden rounded-[1.4rem] border-[2px] border-ink/80 bg-paper/95 p-3 shadow-[3px_3px_0_rgba(6,24,28,0.08)]"
                   whileHover={
                     reduce
@@ -385,6 +385,10 @@ export function BrowsePage() {
         Covered by the{' '}
         <Link to="/guarantee" className="font-semibold text-lagoon">
           KampeDrop Guarantee
+        </Link>
+        {' · '}
+        <Link to={appPath('/find-order')} className="font-semibold text-lagoon">
+          Find my order
         </Link>
       </p>
     </AppShell>

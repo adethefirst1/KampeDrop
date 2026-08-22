@@ -81,7 +81,10 @@ type CartContextValue = {
   subtotal: number
   deliveryFee: number
   total: number
-  addItem: (vendorId: string, item: MenuItem) => { ok: true } | { ok: false; reason: string }
+  addItem: (
+    vendorId: string,
+    item: MenuItem,
+  ) => { ok: true } | { ok: false; reason: string; code?: 'vendor_conflict' }
   setQty: (itemId: string, qty: number) => void
   clear: () => void
   /** Replace cart with live copies of an order’s lines (skips unavailable items). */
@@ -113,12 +116,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [vendorId, getVendor, vendors])
 
   const addItem = useCallback((nextVendorId: string, item: MenuItem) => {
-    let result: { ok: true } | { ok: false; reason: string } = { ok: true }
+    let result:
+      | { ok: true }
+      | { ok: false; reason: string; code?: 'vendor_conflict' } = { ok: true }
     setLines((prev) => {
       if (prev.length && prev[0].vendorId !== nextVendorId) {
         result = {
           ok: false,
-          reason: 'One vendor per order for now — clear your cart to switch.',
+          code: 'vendor_conflict',
+          reason: 'Your cart has items from another shop.',
         }
         return prev
       }

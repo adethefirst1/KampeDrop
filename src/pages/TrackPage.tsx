@@ -417,12 +417,20 @@ export function TrackPage() {
             Order not found
           </h1>
           <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted">
-            This link may be from another phone or browser. Place a new order, or
-            call KampeDrop with your order ID.
+            This link may be from another phone or browser. Find the order with
+            your ID and checkout phone, or place a new one.
           </p>
-          <Link to={appPath()} className="btn-primary mt-8 inline-flex">
-            Browse vendors
-          </Link>
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <Link to={appPath('/find-order')} className="btn-primary inline-flex">
+              Find my order
+            </Link>
+            <Link
+              to={appPath()}
+              className="text-sm font-semibold text-lagoon hover:underline"
+            >
+              Browse vendors
+            </Link>
+          </div>
         </div>
       </OrderLayout>
     )

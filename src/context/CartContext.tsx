@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { DELIVERY_FEE, type MenuItem, type Vendor } from '../data/vendors'
+import { DELIVERY_FEE, isBuyerVisible, type MenuItem, type Vendor } from '../data/vendors'
 import {
   createOrderId,
   createPasskey,
@@ -84,6 +84,10 @@ type CartContextValue = {
   addItem: (vendorId: string, item: MenuItem) => { ok: true } | { ok: false; reason: string }
   setQty: (itemId: string, qty: number) => void
   clear: () => void
+  /** Replace cart with live copies of an order’s lines (skips unavailable items). */
+  reorderFromOrder: (order: PlacedOrder) =>
+    | { ok: true; added: number; skipped: number }
+    | { ok: false; reason: string }
   lastOrder: PlacedOrder | null
   /** Build order from cart without clearing (for cloud insert first). */
   draftOrder: (input: PlaceOrderInput) => PlacedOrder
@@ -138,6 +142,53 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clear = useCallback(() => setLines([]), [])
 
+  const reorderFromOrder = useCallback(
+    (order: PlacedOrder) => {
+      const firstVendorId = order.lines[0]?.vendorId
+      if (!firstVendorId || order.lines.length === 0) {
+        return { ok: false as const, reason: 'Nothing to reorder from this order.' }
+      }
+      const shop = getVendor(firstVendorId)
+      if (!shop || !isBuyerVisible(shop)) {
+        return {
+          ok: false as const,
+          reason: 'That shop isn’t available on KampeDrop right now.',
+        }
+      }
+
+      const next: CartLine[] = []
+      let skipped = 0
+      for (const line of order.lines) {
+        if (line.vendorId !== shop.id) {
+          skipped += 1
+          continue
+        }
+        const live = shop.items.find((i) => i.id === line.item.id)
+        if (!live || live.available === false) {
+          skipped += 1
+          continue
+        }
+        const qty = Math.max(1, Math.floor(line.qty) || 1)
+        const existing = next.find((l) => l.item.id === live.id)
+        if (existing) {
+          existing.qty += qty
+        } else {
+          next.push({ vendorId: shop.id, item: live, qty })
+        }
+      }
+
+      if (next.length === 0) {
+        return {
+          ok: false as const,
+          reason: 'Those items aren’t on the menu anymore.',
+        }
+      }
+
+      setLines(next)
+      return { ok: true as const, added: next.length, skipped }
+    },
+    [getVendor],
+  )
   const draftOrder = useCallback(
     (input: PlaceOrderInput) => {
       const subtotal = lines.reduce((sum, l) => sum + l.item.price * l.qty, 0)
@@ -208,6 +259,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItem,
       setQty,
       clear,
+      reorderFromOrder,
       lastOrder,
       draftOrder,
       commitOrder,
@@ -222,6 +274,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItem,
       setQty,
       clear,
+      reorderFromOrder,
       lastOrder,
       draftOrder,
       commitOrder,

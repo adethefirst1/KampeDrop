@@ -1,4 +1,4 @@
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { appPath } from '../paths'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -52,12 +52,14 @@ function isPaystackPending(state: string | undefined): boolean {
 
 export function TrackPage() {
   const { orderId } = useParams()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { lastOrder } = useCart()
+  const { lastOrder, reorderFromOrder } = useCart()
   const { getVendor } = useCatalog()
   const { getOrder: getOpsOrder, cancelOrder, flagProblem } =
     useOps()
   const reduce = useReducedMotion()
+  const [reorderError, setReorderError] = useState<string | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
@@ -751,12 +753,32 @@ export function TrackPage() {
         </div>
       )}
 
-      <Link
-        to={appPath()}
-        className="mt-8 block text-center text-sm font-semibold text-lagoon hover:underline"
-      >
-        Order again
-      </Link>
+      <div className="mt-8 text-center">
+        <button
+          type="button"
+          onClick={() => {
+            if (!order) return
+            setReorderError(null)
+            const result = reorderFromOrder(order)
+            if (!result.ok) {
+              setReorderError(result.reason)
+              return
+            }
+            navigate(appPath('/cart'))
+          }}
+          className="text-sm font-semibold text-lagoon hover:underline"
+        >
+          Order again
+        </button>
+        {reorderError && (
+          <p className="mx-auto mt-2 max-w-xs text-xs font-semibold text-mango-deep">
+            {reorderError}
+          </p>
+        )}
+        <p className="mt-1 text-xs text-muted">
+          Reloads this order’s items into your cart
+        </p>
+      </div>
     </OrderLayout>
   )
 }

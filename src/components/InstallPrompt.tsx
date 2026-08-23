@@ -71,10 +71,10 @@ const vendorSteps: Record<Platform, { title: string; items: string[] }> = {
   android: {
     title: 'Install your vendor board on Android',
     items: [
-      'Open your vendor board in Chrome (refresh once on /vendor).',
-      'Tap Install below, or Chrome menu ⋮ → Install app / Add to Home screen.',
-      'If an old KampeDrop icon still opens ordering, long-press it → Remove, then install again from this page.',
-      'The new KD Vendor icon should open Orders.',
+      'Open the vendor board in Chrome (address must include /vendor). Hard-refresh once.',
+      'Tap Install below, or Chrome ⋮ → Install app. The dialog should say KD Vendor — not KampeDrop.',
+      'If it still says KampeDrop / opens ordering: remove that icon, clear the site from Chrome app list, then install again from /vendor.',
+      'Open the new KD Vendor icon — it should land on Orders.',
     ],
   },
   desktop: {

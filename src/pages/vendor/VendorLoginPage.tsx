@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
+import { VendorInstallButton } from '../../components/InstallPrompt'
 import { NgPhoneField } from '../../components/NgPhoneField'
 import { useVendor } from '../../context/VendorContext'
 import { SITE, whatsappHelpUrl } from '../../data/site'
@@ -94,6 +95,10 @@ export function VendorLoginPage() {
             <Link to={vendorPath('/signup')} className="text-lagoon hover:underline">
               Register your business
             </Link>
+          </p>
+          <p>
+            <VendorInstallButton className="text-lagoon hover:underline" />
+            <span className="text-muted"> — add the board to your home screen</span>
           </p>
           <a href={helpUrl} target="_blank" rel="noreferrer" className="text-lagoon hover:underline">
             Need help? WhatsApp us

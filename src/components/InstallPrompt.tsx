@@ -11,6 +11,7 @@ type BeforeInstallPromptEvent = Event & {
 }
 
 type Platform = 'ios' | 'android' | 'desktop'
+type Audience = 'customer' | 'vendor'
 
 function detectPlatform(): Platform {
   if (typeof navigator === 'undefined') return 'desktop'
@@ -26,7 +27,7 @@ function isIosSafari() {
   return /iphone|ipad|ipod/i.test(ua) && /^((?!chrome|android).)*safari/i.test(ua)
 }
 
-const steps: Record<Platform, { title: string; items: string[] }> = {
+const customerSteps: Record<Platform, { title: string; items: string[] }> = {
   ios: {
     title: 'Add KampeDrop to your iPhone',
     items: [
@@ -52,6 +53,37 @@ const steps: Record<Platform, { title: string; items: string[] }> = {
       'Or tap Install below if your browser offers it.',
       'KampeDrop opens in its own window, like a normal app.',
       'On your phone, visit kampedrop and use Add to Home Screen for the best experience.',
+    ],
+  },
+}
+
+/** Prefer Add to Home Screen so the icon opens /vendor, not customer /app. */
+const vendorSteps: Record<Platform, { title: string; items: string[] }> = {
+  ios: {
+    title: 'Add your vendor board to iPhone',
+    items: [
+      'Stay on this vendor page in Safari (not Chrome or WhatsApp browser).',
+      'Tap the Share button at the bottom of Safari.',
+      'Scroll and tap Add to Home Screen.',
+      'Name it e.g. KampeDrop Vendor, tap Add. Open that icon anytime for Orders.',
+    ],
+  },
+  android: {
+    title: 'Add your vendor board on Android',
+    items: [
+      'Stay on this vendor board page in Chrome.',
+      'Tap the Chrome menu ⋮ (top right).',
+      'Choose Add to Home screen (not the customer Install app shortcut).',
+      'Confirm. Open the icon anytime — it should land on your vendor board.',
+    ],
+  },
+  desktop: {
+    title: 'Put the vendor board on your phone',
+    items: [
+      'Open your vendor board URL on your phone in Chrome or Safari.',
+      'Use Add to Home Screen so Orders is one tap away during service.',
+      'On this computer, bookmark /vendor for desk use.',
+      'Sign in once on the phone icon — stay signed in on that device.',
     ],
   },
 }
@@ -113,18 +145,28 @@ export function AppEntryButton({
   )
 }
 
-export function InstallPrompt({ compact = false }: { compact?: boolean }) {
-  const { deferred, installed, platform, iosSafari } = useInstallAvailability()
+export function InstallPrompt({
+  compact = false,
+  audience = 'customer',
+}: {
+  compact?: boolean
+  audience?: Audience
+}) {
+  const { deferred, installed, platform } = useInstallAvailability()
   const [open, setOpen] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const dismissKey =
+    audience === 'vendor'
+      ? 'kampedrop-vendor-install-dismissed'
+      : 'kampedrop-install-dismissed'
 
   useEffect(() => {
     try {
-      setDismissed(sessionStorage.getItem('kampedrop-install-dismissed') === '1')
+      setDismissed(sessionStorage.getItem(dismissKey) === '1')
     } catch {
       /* ignore */
     }
-  }, [])
+  }, [dismissKey])
 
   if (installed || dismissed) return null
 
@@ -132,14 +174,20 @@ export function InstallPrompt({ compact = false }: { compact?: boolean }) {
     setDismissed(true)
     setOpen(false)
     try {
-      sessionStorage.setItem('kampedrop-install-dismissed', '1')
+      sessionStorage.setItem(dismissKey, '1')
     } catch {
       /* ignore */
     }
   }
 
   const label =
-    platform === 'ios' ? 'How to install' : deferred ? 'Install app' : 'How to install'
+    audience === 'vendor'
+      ? 'How to install on your phone'
+      : platform === 'ios'
+        ? 'How to install'
+        : deferred
+          ? 'Install app'
+          : 'How to install'
 
   if (compact) {
     return (
@@ -151,14 +199,14 @@ export function InstallPrompt({ compact = false }: { compact?: boolean }) {
         >
           {label}
         </button>
-        <AppGuideSheet open={open} onClose={() => setOpen(false)} mode="install" />
+        <AppGuideSheet
+          open={open}
+          onClose={() => setOpen(false)}
+          mode="install"
+          audience={audience}
+        />
       </>
     )
-  }
-
-  // Bottom coach mark — always available with instructions
-  if (!deferred && !iosSafari && platform === 'desktop') {
-    // still show — desktop users need guidance too
   }
 
   return (
@@ -172,9 +220,17 @@ export function InstallPrompt({ compact = false }: { compact?: boolean }) {
           transition={springSoft}
         >
           <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-2 rounded-2xl border border-white/10 bg-ink px-3 py-3 text-white shadow-[0_12px_40px_rgba(14,28,24,0.4)] sm:gap-3 sm:px-4 sm:py-3.5">
-            <img src="/icons/icon-192.png" alt="" className="h-10 w-10 shrink-0 rounded-xl sm:h-11 sm:w-11" />
+            <img
+              src="/icons/icon-192.png"
+              alt=""
+              className="h-10 w-10 shrink-0 rounded-xl sm:h-11 sm:w-11"
+            />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold leading-snug">Put KampeDrop on your home screen</p>
+              <p className="text-sm font-bold leading-snug">
+                {audience === 'vendor'
+                  ? 'Put your vendor board on the home screen'
+                  : 'Put KampeDrop on your home screen'}
+              </p>
               <p className="hidden text-xs text-white/60 sm:block">
                 We’ll show you the exact steps for your phone.
               </p>
@@ -197,7 +253,12 @@ export function InstallPrompt({ compact = false }: { compact?: boolean }) {
           </div>
         </motion.div>
       </AnimatePresence>
-      <AppGuideSheet open={open} onClose={() => setOpen(false)} mode="install" />
+      <AppGuideSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        mode="install"
+        audience={audience}
+      />
     </>
   )
 }
@@ -206,20 +267,22 @@ export function AppGuideSheet({
   open,
   onClose,
   mode = 'entry',
+  audience = 'customer',
 }: {
   open: boolean
   onClose: () => void
   mode?: 'entry' | 'install'
+  audience?: Audience
   light?: boolean
 }) {
   const { deferred, installed, platform } = useInstallAvailability()
-  const guide = steps[platform]
+  const guide = (audience === 'vendor' ? vendorSteps : customerSteps)[platform]
   const [busy, setBusy] = useState(false)
   const [view, setView] = useState<'choose' | 'install'>(
     mode === 'install' ? 'install' : 'choose',
   )
-
   const [mounted, setMounted] = useState(false)
+  const isVendor = audience === 'vendor'
 
   useEffect(() => {
     setMounted(true)
@@ -239,7 +302,7 @@ export function AppGuideSheet({
   }, [open])
 
   async function runNativeInstall() {
-    if (!deferred) {
+    if (!deferred || isVendor) {
       setView('install')
       return
     }
@@ -268,7 +331,7 @@ export function AppGuideSheet({
           onClick={onClose}
         >
           <motion.div
-            className="flex w-full max-w-md max-h-[min(88dvh,36rem)] flex-col overflow-hidden rounded-[1.75rem] bg-paper text-ink shadow-2xl"
+            className="flex max-h-[min(88dvh,36rem)] w-full max-w-md flex-col overflow-hidden rounded-[1.75rem] bg-paper text-ink shadow-2xl"
             initial={{ y: 28, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 16, opacity: 0, scale: 0.98 }}
@@ -286,7 +349,7 @@ export function AppGuideSheet({
               />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-lagoon">
-                  KampeDrop app
+                  {isVendor ? 'Vendor board' : 'KampeDrop app'}
                 </p>
                 <h2
                   id="app-guide-title"
@@ -309,44 +372,53 @@ export function AppGuideSheet({
               {view === 'choose' ? (
                 <div className="space-y-3">
                   <p className="text-sm leading-relaxed text-muted">
-                    You can order in your browser right now, or install KampeDrop so it sits
-                    on your home screen like a normal app.
+                    {isVendor
+                      ? 'Use the board in your browser now, or add it to your home screen so Orders is one tap away.'
+                      : 'You can order in your browser right now, or install KampeDrop so it sits on your home screen like a normal app.'}
                   </p>
 
-                  <Link
-                    to={APP_BASE}
-                    onClick={onClose}
-                    className="btn-primary flex w-full shadow-[0_10px_28px_rgba(255,107,44,0.25)]"
-                  >
-                    Continue in browser
-                  </Link>
+                  {isVendor ? (
+                    <button type="button" className="btn-primary w-full" onClick={onClose}>
+                      Continue in browser
+                    </button>
+                  ) : (
+                    <Link
+                      to={APP_BASE}
+                      onClick={onClose}
+                      className="btn-primary flex w-full shadow-[0_10px_28px_rgba(255,107,44,0.25)]"
+                    >
+                      Continue in browser
+                    </Link>
+                  )}
 
                   {!installed && (
                     <button
                       type="button"
                       className="btn-ink w-full"
                       onClick={() => {
-                        if (deferred) void runNativeInstall()
+                        if (!isVendor && deferred) void runNativeInstall()
                         else setView('install')
                       }}
                     >
-                      {deferred ? 'Install app' : 'Show install steps'}
+                      {!isVendor && deferred ? 'Install app' : 'Show install steps'}
                     </button>
                   )}
 
                   <div className="rounded-2xl bg-mist px-4 py-3 text-sm text-ink-soft">
                     <p className="font-semibold text-ink">Tip</p>
                     <p className="mt-1 leading-relaxed">
-                      Installing is free and takes under a minute. No App Store download
-                      needed.
+                      {isVendor
+                        ? 'Add to Home Screen from this vendor page so the icon opens your board — not the customer order app.'
+                        : 'Installing is free and takes under a minute. No App Store download needed.'}
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <p className="text-sm leading-relaxed text-muted">
-                    Follow these steps on your device. When you’re done, open the KampeDrop
-                    icon — it goes straight to ordering.
+                    {isVendor
+                      ? 'Follow these steps on your phone. When you’re done, open the icon — it should open your vendor board.'
+                      : 'Follow these steps on your device. When you’re done, open the KampeDrop icon — it goes straight to ordering.'}
                   </p>
 
                   <ol className="space-y-3">
@@ -363,18 +435,7 @@ export function AppGuideSheet({
                     ))}
                   </ol>
 
-                  {platform === 'android' && deferred && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void runNativeInstall()}
-                      className="btn-primary w-full disabled:opacity-70"
-                    >
-                      {busy ? 'Opening install…' : 'Install now'}
-                    </button>
-                  )}
-
-                  {platform === 'desktop' && deferred && (
+                  {!isVendor && (platform === 'android' || platform === 'desktop') && deferred && (
                     <button
                       type="button"
                       disabled={busy}
@@ -388,7 +449,15 @@ export function AppGuideSheet({
                   {platform === 'ios' && (
                     <div className="rounded-2xl border border-lagoon/20 bg-lagoon/8 px-4 py-3 text-sm text-lagoon-deep">
                       Must use <span className="font-bold">Safari</span>. In-app browsers
-                      (WhatsApp, Instagram) often hide the Share → Add to Home Screen option.
+                      (WhatsApp, Instagram) often hide Share → Add to Home Screen.
+                    </div>
+                  )}
+
+                  {isVendor && platform === 'android' && (
+                    <div className="rounded-2xl border border-lagoon/20 bg-lagoon/8 px-4 py-3 text-sm text-lagoon-deep">
+                      Prefer <span className="font-bold">Add to Home screen</span> while on
+                      this vendor page. Chrome’s “Install app” shortcut opens the customer
+                      ordering app instead.
                     </div>
                   )}
 
@@ -402,13 +471,23 @@ export function AppGuideSheet({
                         Back
                       </button>
                     )}
-                    <Link
-                      to={APP_BASE}
-                      onClick={onClose}
-                      className="btn-primary flex flex-1 items-center justify-center"
-                    >
-                      Order in browser instead
-                    </Link>
+                    {isVendor ? (
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="btn-primary flex flex-1 items-center justify-center"
+                      >
+                        Got it
+                      </button>
+                    ) : (
+                      <Link
+                        to={APP_BASE}
+                        onClick={onClose}
+                        className="btn-primary flex flex-1 items-center justify-center"
+                      >
+                        Order in browser instead
+                      </Link>
+                    )}
                   </div>
                 </div>
               )}
@@ -421,7 +500,7 @@ export function AppGuideSheet({
   )
 }
 
-/** Soft tip inside the app for first-time visitors */
+/** Soft tip inside the customer app for first-time visitors */
 export function InAppInstallTip() {
   const { installed } = useInstallAvailability()
   const [open, setOpen] = useState(false)
@@ -472,6 +551,95 @@ export function InAppInstallTip() {
         </div>
       </div>
       <AppGuideSheet open={open} onClose={() => setOpen(false)} mode="install" />
+    </>
+  )
+}
+
+/** Tip + how-to on the vendor board (same web app, vendor-specific steps). */
+export function VendorInstallTip() {
+  const { installed } = useInstallAvailability()
+  const [open, setOpen] = useState(false)
+  const [hidden, setHidden] = useState(true)
+
+  useEffect(() => {
+    if (installed) {
+      setHidden(true)
+      return
+    }
+    try {
+      setHidden(sessionStorage.getItem('kampedrop-vendor-tip-hidden') === '1')
+    } catch {
+      setHidden(false)
+    }
+  }, [installed])
+
+  if (installed || hidden) return null
+
+  return (
+    <>
+      <div className="mb-5 rounded-2xl border border-lagoon/20 bg-paper px-4 py-3.5 shadow-sm">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-lagoon">
+          On your phone
+        </p>
+        <p className="mt-1.5 text-sm font-semibold leading-snug text-ink">
+          Add this vendor board to your home screen — one tap to Orders during service.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="rounded-full bg-ink px-3.5 py-2 text-xs font-bold text-white"
+          >
+            Show install steps
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setHidden(true)
+              try {
+                sessionStorage.setItem('kampedrop-vendor-tip-hidden', '1')
+              } catch {
+                /* ignore */
+              }
+            }}
+            className="rounded-full bg-mist px-3.5 py-2 text-xs font-bold text-muted"
+          >
+            Later
+          </button>
+        </div>
+      </div>
+      <AppGuideSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        mode="install"
+        audience="vendor"
+      />
+    </>
+  )
+}
+
+/** Always-available “how to install” control for vendor login / footer. */
+export function VendorInstallButton({
+  className = 'text-lagoon hover:underline',
+}: {
+  className?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const { installed } = useInstallAvailability()
+
+  if (installed) return null
+
+  return (
+    <>
+      <button type="button" className={className} onClick={() => setOpen(true)}>
+        Install on your phone
+      </button>
+      <AppGuideSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        mode="install"
+        audience="vendor"
+      />
     </>
   )
 }

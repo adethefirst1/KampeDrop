@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { VendorInstallButton, VendorInstallTip } from '../../components/InstallPrompt'
 import { useCatalog } from '../../context/CatalogContext'
 import { useVendor } from '../../context/VendorContext'
 import { SITE } from '../../data/site'
@@ -120,6 +121,7 @@ export function VendorShell() {
       )}
 
       <main className="mx-auto max-w-lg px-4 py-5 pb-24">
+        <VendorInstallTip />
         <Outlet />
       </main>
       <p className="pb-[max(1rem,env(safe-area-inset-bottom))] text-center text-[11px] font-semibold text-muted">
@@ -127,7 +129,7 @@ export function VendorShell() {
           Work with us
         </Link>
         {' · '}
-        No app download
+        <VendorInstallButton className="text-lagoon hover:underline" />
       </p>
     </div>
   )

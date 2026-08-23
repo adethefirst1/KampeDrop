@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useCart } from '../context/CartContext'
@@ -26,22 +26,20 @@ export function Logo({
   return (
     <Link to={to} className="inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
       <span
-        className={`grid shrink-0 place-items-center rounded-xl ${icon} ${
-          light ? 'bg-white/15 text-white' : 'bg-ink text-paper'
-        }`}
+        className={`grid shrink-0 place-items-center rounded-xl bg-ink ${icon}`}
         aria-hidden
       >
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
           <path
             d="M3 7.2C3 4.5 5.2 2.2 9 2.2s6 2.3 6 5v4.4c0 .9-.7 1.6-1.6 1.6H4.6C3.7 13.2 3 12.5 3 11.6V7.2z"
-            fill="currentColor"
+            fill="#efc27a"
             opacity="0.35"
           />
           <path
             d="M5.2 8h7.6v1.2H5.2V8zm0 2.4h4.8V11.6H5.2V10.4z"
-            fill={light ? '#F3F8F6' : '#0c6560'}
+            fill="#efc27a"
           />
-          <circle cx="13.2" cy="4.2" r="2" fill="#d9772f" />
+          <circle cx="13.2" cy="4.2" r="2" fill="#efc27a" />
         </svg>
       </span>
       <span
@@ -56,50 +54,21 @@ export function Logo({
 }
 
 const marketingNav = [
-  { to: appPath(), label: 'Order', short: 'Order' },
   { to: '/how', label: 'How it works', short: 'How' },
   { to: '/work-with-us', label: 'Work with us', short: 'Sell' },
   { to: '/guarantee', label: 'Guarantee', short: 'Guarantee' },
 ]
 
-export function MarketingHeader({ transparent = false }: { transparent?: boolean }) {
+export function MarketingHeader(_props: { transparent?: boolean } = {}) {
   const { itemCount } = useCart()
-  const location = useLocation()
-  const [overHero, setOverHero] = useState(true)
-
-  useEffect(() => {
-    if (!transparent || location.pathname !== '/') {
-      setOverHero(false)
-      return
-    }
-
-    const update = () => {
-      // Stay dark only while the first viewport (hero) is still dominant.
-      setOverHero(window.scrollY < window.innerHeight * 0.72)
-    }
-
-    update()
-    window.addEventListener('scroll', update, { passive: true })
-    window.addEventListener('resize', update)
-    return () => {
-      window.removeEventListener('scroll', update)
-      window.removeEventListener('resize', update)
-    }
-  }, [transparent, location.pathname])
-
-  const onDark = transparent && location.pathname === '/' && overHero
 
   return (
     <header
-      className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${
-        onDark
-          ? 'border-white/10 bg-ink/70 text-white'
-          : 'border-line/70 bg-paper/95 text-ink'
-      }`}
+      className="sticky top-0 z-50 border-b border-line/70 bg-paper/95 text-ink backdrop-blur-md"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <div className="container-site flex h-14 items-center justify-between gap-2 sm:gap-3 md:h-16 md:gap-4">
-        <Logo light={onDark} />
+        <Logo />
 
         <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
           {marketingNav.map((item) => (
@@ -109,12 +78,8 @@ export function MarketingHeader({ transparent = false }: { transparent?: boolean
               className={({ isActive }) =>
                 `rounded-full px-3.5 py-2 text-sm font-semibold transition ${
                   isActive
-                    ? onDark
-                      ? 'bg-white/15 text-white'
-                      : 'bg-mist text-ink'
-                    : onDark
-                      ? 'text-white/70 hover:bg-white/10 hover:text-white'
-                      : 'text-muted hover:bg-mist hover:text-ink'
+                    ? 'bg-mist text-ink'
+                    : 'text-muted hover:bg-mist hover:text-ink'
                 }`
               }
             >
@@ -126,33 +91,24 @@ export function MarketingHeader({ transparent = false }: { transparent?: boolean
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Link
             to={appPath('/cart')}
-            className={`relative inline-flex items-center justify-center rounded-full px-2.5 py-2 text-sm font-semibold transition sm:px-3 ${
-              onDark ? 'bg-white/10 hover:bg-white/15' : 'bg-mist hover:bg-line/50'
-            }`}
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-ink transition hover:bg-mist"
             aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
           >
-            <span className="sm:hidden" aria-hidden>
-              <CartIcon />
-            </span>
-            <span className="hidden sm:inline">Cart</span>
+            <CartIcon />
             {itemCount > 0 && (
               <motion.span
                 key={itemCount}
                 initial={{ scale: 0.6, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={springSnap}
-                className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white sm:static sm:ml-1.5"
+                className="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white"
               >
                 {itemCount}
               </motion.span>
             )}
           </Link>
-          <AppEntryButton
-            className={`inline-flex items-center justify-center rounded-full bg-mango px-3 py-2 text-xs font-extrabold text-white transition hover:bg-mango-deep sm:px-3.5 sm:py-2.5 sm:text-sm ${
-              onDark ? 'shadow-[0_2px_0_#9a4f16]' : ''
-            }`}
-          >
-            Order
+          <AppEntryButton className="inline-flex items-center justify-center rounded-full bg-mango px-3 py-2 text-xs font-extrabold text-white transition hover:bg-mango-deep sm:px-3.5 sm:py-2.5 sm:text-sm">
+            Order now
           </AppEntryButton>
         </div>
       </div>
@@ -168,13 +124,7 @@ export function MarketingHeader({ transparent = false }: { transparent?: boolean
             to={item.to}
             className={({ isActive }) =>
               `shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap ${
-                isActive
-                  ? onDark
-                    ? 'bg-white/18 text-white'
-                    : 'bg-ink text-white'
-                  : onDark
-                    ? 'bg-white/8 text-white/75'
-                    : 'bg-mist text-muted'
+                isActive ? 'bg-ink text-white' : 'bg-mist text-muted'
               }`
             }
           >

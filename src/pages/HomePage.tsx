@@ -6,6 +6,7 @@ import { AppEntryButton } from '../components/InstallPrompt'
 import { MotionItem, Reveal, SecureSeal, Stagger } from '../components/motion'
 import { CartoonHero } from '../components/CartoonHero'
 import { CategoryMorphCarousel } from '../components/CategoryMorphCarousel'
+import { HowStoryCarousel } from '../components/HowStoryCarousel'
 import { IMAGES, SITE } from '../data/site'
 import { categoryLabel } from '../data/vendors'
 import { useCatalog } from '../context/CatalogContext'
@@ -168,57 +169,8 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* How */}
-      <section className="wave-line py-20 md:py-28">
-        <div className="container-site">
-          <Reveal>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-lagoon">How it works</p>
-            <h2 className="mt-3 max-w-[18ch] font-display text-3xl font-semibold tracking-[-0.03em] md:text-[2.75rem] md:leading-[1.1]">
-              Four quiet steps from your Badagry home.
-            </h2>
-          </Reveal>
-          <Stagger className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4" as="ol">
-            {[
-              {
-                n: '01',
-                t: 'Order',
-                d: 'Pick a vetted kitchen, mart, or pharmacy near you.',
-              },
-              {
-                n: '02',
-                t: 'Confirm',
-                d: 'Instant confirmation — not a silent chat.',
-              },
-              {
-                n: '03',
-                t: 'Track',
-                d: 'Preparing → on the Expressway → at your gate.',
-              },
-              {
-                n: '04',
-                t: 'Secure',
-                d: 'Delivered — or we make it right. That’s the promise.',
-              },
-            ].map((step) => (
-              <MotionItem
-                key={step.n}
-                as="li"
-                variants={fadeUp}
-                className="rounded-[1.5rem] bg-paper p-5 ring-1 ring-line"
-              >
-                <p className="font-display text-2xl font-semibold text-mango">{step.n}</p>
-                <h3 className="mt-3 text-lg font-bold">{step.t}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{step.d}</p>
-              </MotionItem>
-            ))}
-          </Stagger>
-          <Reveal className="mt-10">
-            <Link to="/how" className="inline-flex text-sm font-bold text-lagoon hover:underline">
-              See the full flow →
-            </Link>
-          </Reveal>
-        </div>
-      </section>
+      {/* How — story carousel */}
+      <HowStoryCarousel />
 
       {/* Vendors */}
       <section className="bg-paper py-20 md:py-28">

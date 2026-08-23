@@ -1,3 +1,4 @@
+import { useEffect, type ReactNode } from 'react'
 import {
   BrowserRouter,
   Navigate,
@@ -6,11 +7,11 @@ import {
   useLocation,
   useParams,
 } from 'react-router-dom'
-import type { ReactNode } from 'react'
 import { CartProvider } from './context/CartContext'
 import { CatalogProvider } from './context/CatalogContext'
 import { OpsProvider } from './context/OpsContext'
 import { VendorProvider } from './context/VendorContext'
+import { audienceFromPath, syncPwaManifest } from './lib/pwaManifest'
 import { HomePage } from './pages/HomePage'
 import { BrowsePage } from './pages/BrowsePage'
 import { CategoryPage } from './pages/CategoryPage'
@@ -48,6 +49,11 @@ import { APP_BASE, appPath, isStandaloneDisplay } from './paths'
 
 function StandaloneGate({ children }: { children: ReactNode }) {
   const location = useLocation()
+
+  useEffect(() => {
+    syncPwaManifest(audienceFromPath(location.pathname))
+  }, [location.pathname])
+
   if (location.pathname.startsWith('/admin')) return children
   if (location.pathname.startsWith('/vendor')) return children
 

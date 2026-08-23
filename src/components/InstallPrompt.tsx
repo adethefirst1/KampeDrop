@@ -57,31 +57,31 @@ const customerSteps: Record<Platform, { title: string; items: string[] }> = {
   },
 }
 
-/** Prefer Add to Home Screen so the icon opens /vendor, not customer /app. */
+/** Prefer Add to Home Screen / Install while the vendor manifest is active (start_url /vendor). */
 const vendorSteps: Record<Platform, { title: string; items: string[] }> = {
   ios: {
     title: 'Add your vendor board to iPhone',
     items: [
-      'Stay on this vendor page in Safari (not Chrome or WhatsApp browser).',
+      'Open your vendor board in Safari (URL starts with /vendor).',
       'Tap the Share button at the bottom of Safari.',
       'Scroll and tap Add to Home Screen.',
-      'Name it e.g. KampeDrop Vendor, tap Add. Open that icon anytime for Orders.',
+      'Name it KD Vendor, tap Add. That icon opens the board — not customer ordering.',
     ],
   },
   android: {
-    title: 'Add your vendor board on Android',
+    title: 'Install your vendor board on Android',
     items: [
-      'Stay on this vendor board page in Chrome.',
-      'Tap the Chrome menu ⋮ (top right).',
-      'Choose Add to Home screen (not the customer Install app shortcut).',
-      'Confirm. Open the icon anytime — it should land on your vendor board.',
+      'Open your vendor board in Chrome (refresh once on /vendor).',
+      'Tap Install below, or Chrome menu ⋮ → Install app / Add to Home screen.',
+      'If an old KampeDrop icon still opens ordering, long-press it → Remove, then install again from this page.',
+      'The new KD Vendor icon should open Orders.',
     ],
   },
   desktop: {
     title: 'Put the vendor board on your phone',
     items: [
-      'Open your vendor board URL on your phone in Chrome or Safari.',
-      'Use Add to Home Screen so Orders is one tap away during service.',
+      'On your phone, open the vendor board URL in Chrome or Safari.',
+      'Install / Add to Home Screen while on /vendor so the icon opens the board.',
       'On this computer, bookmark /vendor for desk use.',
       'Sign in once on the phone icon — stay signed in on that device.',
     ],
@@ -302,7 +302,7 @@ export function AppGuideSheet({
   }, [open])
 
   async function runNativeInstall() {
-    if (!deferred || isVendor) {
+    if (!deferred) {
       setView('install')
       return
     }
@@ -396,11 +396,11 @@ export function AppGuideSheet({
                       type="button"
                       className="btn-ink w-full"
                       onClick={() => {
-                        if (!isVendor && deferred) void runNativeInstall()
+                        if (deferred) void runNativeInstall()
                         else setView('install')
                       }}
                     >
-                      {!isVendor && deferred ? 'Install app' : 'Show install steps'}
+                      {deferred ? 'Install app' : 'Show install steps'}
                     </button>
                   )}
 
@@ -408,7 +408,7 @@ export function AppGuideSheet({
                     <p className="font-semibold text-ink">Tip</p>
                     <p className="mt-1 leading-relaxed">
                       {isVendor
-                        ? 'Add to Home Screen from this vendor page so the icon opens your board — not the customer order app.'
+                        ? 'Install while on /vendor. This creates a separate KD Vendor icon that opens the board — not the customer order app.'
                         : 'Installing is free and takes under a minute. No App Store download needed.'}
                     </p>
                   </div>
@@ -435,7 +435,7 @@ export function AppGuideSheet({
                     ))}
                   </ol>
 
-                  {!isVendor && (platform === 'android' || platform === 'desktop') && deferred && (
+                  {(platform === 'android' || platform === 'desktop') && deferred && (
                     <button
                       type="button"
                       disabled={busy}
@@ -453,11 +453,11 @@ export function AppGuideSheet({
                     </div>
                   )}
 
-                  {isVendor && platform === 'android' && (
+                  {isVendor && (
                     <div className="rounded-2xl border border-lagoon/20 bg-lagoon/8 px-4 py-3 text-sm text-lagoon-deep">
-                      Prefer <span className="font-bold">Add to Home screen</span> while on
-                      this vendor page. Chrome’s “Install app” shortcut opens the customer
-                      ordering app instead.
+                      Hard-refresh this vendor page first. If an old KampeDrop icon still
+                      opens ordering, remove it, then install again — you want the{' '}
+                      <span className="font-bold">KD Vendor</span> icon.
                     </div>
                   )}
 

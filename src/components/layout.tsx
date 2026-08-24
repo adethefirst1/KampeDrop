@@ -64,7 +64,9 @@ const marketingNav = [
 export function MarketingHeader({ transparent = false }: { transparent?: boolean }) {
   const { itemCount } = useCart()
   const location = useLocation()
+  const reduce = useReducedMotion()
   const [overHero, setOverHero] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     if (!transparent || location.pathname !== '/') {
@@ -73,7 +75,6 @@ export function MarketingHeader({ transparent = false }: { transparent?: boolean
     }
 
     const update = () => {
-      // Float over the dark hero, then settle into warm paper with the body.
       setOverHero(window.scrollY < window.innerHeight * 0.55)
     }
 
@@ -86,105 +87,199 @@ export function MarketingHeader({ transparent = false }: { transparent?: boolean
     }
   }, [transparent, location.pathname])
 
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [location.pathname])
+
   const onHero = transparent && location.pathname === '/' && overHero
+  // Cart only when shopping — or once the paper bar is on (past first paint).
+  const showCart = itemCount > 0 || !onHero
 
   return (
-    <header
-      className={`sticky top-0 z-50 transition-[background-color,border-color,box-shadow] duration-300 ${
-        onHero
-          ? 'border-b border-transparent bg-transparent text-white'
-          : 'border-b border-line/50 bg-[#fffaf4]/92 text-ink shadow-[0_8px_28px_rgba(6,24,28,0.06)] backdrop-blur-md'
-      }`}
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
-      <div className="container-site flex h-14 items-center justify-between gap-2 sm:gap-3 md:h-[4.25rem] md:gap-4">
-        <Logo light={onHero} />
-
-        <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">
-          {marketingNav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `rounded-full px-3.5 py-2 text-sm font-semibold transition ${
-                  isActive
-                    ? onHero
-                      ? 'bg-white/18 text-white'
-                      : 'bg-mango/12 text-mango-deep'
-                    : onHero
-                      ? 'text-white/75 hover:bg-white/10 hover:text-white'
-                      : 'text-muted hover:bg-mist hover:text-ink'
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <Link
-            to={appPath('/cart')}
-            className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
-              onHero
-                ? 'text-white hover:bg-white/15'
-                : 'text-ink hover:bg-mango/10'
-            }`}
-            aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
-          >
-            <CartIcon />
-            {itemCount > 0 && (
-              <motion.span
-                key={itemCount}
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={springSnap}
-                className="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white"
-              >
-                {itemCount}
-              </motion.span>
-            )}
-          </Link>
-          <AppEntryButton
-            className={`inline-flex items-center justify-center rounded-full px-3.5 py-2.5 text-xs font-extrabold transition sm:px-4 sm:text-sm ${
-              onHero
-                ? 'bg-mango text-white shadow-[0_4px_0_#9a4f16] hover:bg-mango-deep'
-                : 'bg-mango text-white shadow-[0_3px_0_#9a4f16] hover:bg-mango-deep'
-            }`}
-          >
-            Order now
-          </AppEntryButton>
-        </div>
-      </div>
-
-      {/* Mobile nav — soft chips that match header mood, not a second bar */}
-      <nav
-        className={`flex gap-1.5 overflow-x-auto px-[max(1rem,calc((100%-min(1120px,100%-2rem))/2))] pb-3 pt-0 [-ms-overflow-style:none] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden ${
-          onHero ? 'border-t border-white/10' : 'border-t border-line/40'
+    <>
+      <header
+        className={`sticky top-0 z-50 transition-[background-color,border-color,box-shadow,color] duration-300 ${
+          onHero
+            ? 'border-b border-transparent bg-transparent text-white'
+            : 'border-b border-line/50 bg-[#fffaf4]/94 text-ink shadow-[0_8px_28px_rgba(6,24,28,0.06)] backdrop-blur-md'
         }`}
-        aria-label="Site"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        {marketingNav.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold whitespace-nowrap transition ${
-                isActive
-                  ? onHero
-                    ? 'bg-white text-ink'
-                    : 'bg-ink text-white'
-                  : onHero
-                    ? 'bg-white/12 text-white/85'
-                    : 'bg-mist/90 text-muted'
-              }`
-            }
+        <div className="container-site flex h-14 items-center justify-between gap-2 md:h-[4.25rem] md:gap-4">
+          <Logo light={onHero} />
+
+          <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">
+            {marketingNav.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+                    isActive
+                      ? onHero
+                        ? 'bg-white/18 text-white'
+                        : 'bg-mango/12 text-mango-deep'
+                      : onHero
+                        ? 'text-white/75 hover:bg-white/10 hover:text-white'
+                        : 'text-muted hover:bg-mist hover:text-ink'
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+            {/* Mobile: Menu holds How / Sell / Guarantee — one row only */}
+            <button
+              type="button"
+              className={`inline-flex h-10 items-center justify-center rounded-full px-3 text-xs font-bold transition md:hidden ${
+                onHero
+                  ? 'text-white/90 hover:bg-white/12'
+                  : 'text-ink-soft hover:bg-mist'
+              }`}
+              aria-expanded={menuOpen}
+              aria-controls="marketing-menu"
+              onClick={() => setMenuOpen(true)}
+            >
+              Menu
+            </button>
+
+            {showCart && (
+              <Link
+                to={appPath('/cart')}
+                className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
+                  onHero
+                    ? 'text-white hover:bg-white/15'
+                    : 'text-ink hover:bg-mango/10'
+                }`}
+                aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
+              >
+                <CartIcon />
+                {itemCount > 0 && (
+                  <motion.span
+                    key={itemCount}
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={springSnap}
+                    className="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white"
+                  >
+                    {itemCount}
+                  </motion.span>
+                )}
+              </Link>
+            )}
+
+            <AppEntryButton
+              className={`inline-flex items-center justify-center rounded-full px-3.5 py-2.5 text-xs font-extrabold transition sm:px-4 sm:text-sm ${
+                onHero
+                  ? 'bg-white text-ink hover:bg-white/90'
+                  : 'bg-mango text-white shadow-[0_3px_0_#9a4f16] hover:bg-mango-deep'
+              }`}
+            >
+              Order
+            </AppEntryButton>
+          </div>
+        </div>
+      </header>
+
+      <MarketingMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        reduce={Boolean(reduce)}
+      />
+    </>
+  )
+}
+
+function MarketingMenu({
+  open,
+  onClose,
+  reduce,
+}: {
+  open: boolean
+  onClose: () => void
+  reduce: boolean
+}) {
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open])
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[70] md:hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduce ? 0.15 : 0.25 }}
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-ink/50"
+            aria-label="Close menu"
+            onClick={onClose}
+          />
+          <motion.div
+            id="marketing-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Site menu"
+            className="absolute inset-x-0 bottom-0 rounded-t-[1.75rem] bg-[#fffaf4] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 shadow-[0_-16px_48px_rgba(6,24,28,0.18)]"
+            initial={reduce ? { opacity: 0 } : { y: '100%' }}
+            animate={reduce ? { opacity: 1 } : { y: 0 }}
+            exit={reduce ? { opacity: 0 } : { y: '100%' }}
+            transition={springSoft}
           >
-            {item.short}
-          </NavLink>
-        ))}
-      </nav>
-    </header>
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/15" aria-hidden />
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-lagoon">
+                Explore
+              </p>
+              <button
+                type="button"
+                onClick={onClose}
+                className="grid h-9 w-9 place-items-center rounded-full bg-mist text-sm font-bold text-muted"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <nav className="mt-3 flex flex-col gap-1" aria-label="Site">
+              {marketingNav.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={onClose}
+                  className={({ isActive }) =>
+                    `rounded-2xl px-4 py-3.5 text-base font-semibold transition ${
+                      isActive
+                        ? 'bg-ink text-dusk'
+                        : 'text-ink hover:bg-mist'
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+            <AppEntryButton
+              className="btn-primary mt-4 w-full"
+              onClick={onClose}
+            >
+              Order in Badagry
+            </AppEntryButton>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 

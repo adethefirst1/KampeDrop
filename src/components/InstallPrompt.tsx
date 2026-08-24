@@ -128,16 +128,25 @@ export function AppEntryButton({
   className,
   children = 'Open app',
   light = false,
+  onClick,
 }: {
   className?: string
   children?: ReactNode
   light?: boolean
+  onClick?: () => void
 }) {
   const [open, setOpen] = useState(false)
 
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className={className}
+        onClick={() => {
+          onClick?.()
+          setOpen(true)
+        }}
+      >
         {children}
       </button>
       <AppGuideSheet open={open} onClose={() => setOpen(false)} mode="entry" light={light} />

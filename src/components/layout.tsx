@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useCart } from '../context/CartContext'
@@ -26,7 +26,9 @@ export function Logo({
   return (
     <Link to={to} className="inline-flex min-w-0 items-center gap-2 sm:gap-2.5">
       <span
-        className={`grid shrink-0 place-items-center rounded-xl bg-ink ${icon}`}
+        className={`grid shrink-0 place-items-center rounded-xl ${icon} ${
+          light ? 'bg-white/20 ring-1 ring-white/25' : 'bg-ink'
+        }`}
         aria-hidden
       >
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -59,18 +61,46 @@ const marketingNav = [
   { to: '/guarantee', label: 'Guarantee', short: 'Guarantee' },
 ]
 
-export function MarketingHeader(_props: { transparent?: boolean } = {}) {
+export function MarketingHeader({ transparent = false }: { transparent?: boolean }) {
   const { itemCount } = useCart()
+  const location = useLocation()
+  const [overHero, setOverHero] = useState(true)
+
+  useEffect(() => {
+    if (!transparent || location.pathname !== '/') {
+      setOverHero(false)
+      return
+    }
+
+    const update = () => {
+      // Float over the dark hero, then settle into warm paper with the body.
+      setOverHero(window.scrollY < window.innerHeight * 0.55)
+    }
+
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [transparent, location.pathname])
+
+  const onHero = transparent && location.pathname === '/' && overHero
 
   return (
     <header
-      className="sticky top-0 z-50 border-b border-line/70 bg-paper/95 text-ink backdrop-blur-md"
+      className={`sticky top-0 z-50 transition-[background-color,border-color,box-shadow] duration-300 ${
+        onHero
+          ? 'border-b border-transparent bg-transparent text-white'
+          : 'border-b border-line/50 bg-[#fffaf4]/92 text-ink shadow-[0_8px_28px_rgba(6,24,28,0.06)] backdrop-blur-md'
+      }`}
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="container-site flex h-14 items-center justify-between gap-2 sm:gap-3 md:h-16 md:gap-4">
-        <Logo />
+      <div className="container-site flex h-14 items-center justify-between gap-2 sm:gap-3 md:h-[4.25rem] md:gap-4">
+        <Logo light={onHero} />
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
+        <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">
           {marketingNav.map((item) => (
             <NavLink
               key={item.to}
@@ -78,8 +108,12 @@ export function MarketingHeader(_props: { transparent?: boolean } = {}) {
               className={({ isActive }) =>
                 `rounded-full px-3.5 py-2 text-sm font-semibold transition ${
                   isActive
-                    ? 'bg-mist text-ink'
-                    : 'text-muted hover:bg-mist hover:text-ink'
+                    ? onHero
+                      ? 'bg-white/18 text-white'
+                      : 'bg-mango/12 text-mango-deep'
+                    : onHero
+                      ? 'text-white/75 hover:bg-white/10 hover:text-white'
+                      : 'text-muted hover:bg-mist hover:text-ink'
                 }`
               }
             >
@@ -88,10 +122,14 @@ export function MarketingHeader(_props: { transparent?: boolean } = {}) {
           ))}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <Link
             to={appPath('/cart')}
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-ink transition hover:bg-mist"
+            className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
+              onHero
+                ? 'text-white hover:bg-white/15'
+                : 'text-ink hover:bg-mango/10'
+            }`}
             aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
           >
             <CartIcon />
@@ -107,15 +145,23 @@ export function MarketingHeader(_props: { transparent?: boolean } = {}) {
               </motion.span>
             )}
           </Link>
-          <AppEntryButton className="inline-flex items-center justify-center rounded-full bg-mango px-3 py-2 text-xs font-extrabold text-white transition hover:bg-mango-deep sm:px-3.5 sm:py-2.5 sm:text-sm">
+          <AppEntryButton
+            className={`inline-flex items-center justify-center rounded-full px-3.5 py-2.5 text-xs font-extrabold transition sm:px-4 sm:text-sm ${
+              onHero
+                ? 'bg-mango text-white shadow-[0_4px_0_#9a4f16] hover:bg-mango-deep'
+                : 'bg-mango text-white shadow-[0_3px_0_#9a4f16] hover:bg-mango-deep'
+            }`}
+          >
             Order now
           </AppEntryButton>
         </div>
       </div>
 
-      {/* Mobile secondary nav — single scroll row, no tall wrap */}
+      {/* Mobile nav — soft chips that match header mood, not a second bar */}
       <nav
-        className="container-site -mx-0 flex gap-1.5 overflow-x-auto pb-2.5 pt-0 [-ms-overflow-style:none] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
+        className={`flex gap-1.5 overflow-x-auto px-[max(1rem,calc((100%-min(1120px,100%-2rem))/2))] pb-3 pt-0 [-ms-overflow-style:none] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden ${
+          onHero ? 'border-t border-white/10' : 'border-t border-line/40'
+        }`}
         aria-label="Site"
       >
         {marketingNav.map((item) => (
@@ -123,8 +169,14 @@ export function MarketingHeader(_props: { transparent?: boolean } = {}) {
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap ${
-                isActive ? 'bg-ink text-white' : 'bg-mist text-muted'
+              `shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold whitespace-nowrap transition ${
+                isActive
+                  ? onHero
+                    ? 'bg-white text-ink'
+                    : 'bg-ink text-white'
+                  : onHero
+                    ? 'bg-white/12 text-white/85'
+                    : 'bg-mist/90 text-muted'
               }`
             }
           >
@@ -157,38 +209,84 @@ function CartIcon() {
   )
 }
 
+function TrackIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 function AppHeader() {
   const { itemCount } = useCart()
   const standalone = isStandaloneDisplay()
+  const location = useLocation()
+  const onBrowse =
+    location.pathname === APP_BASE || location.pathname === `${APP_BASE}/`
 
   return (
-    <header className="sticky top-0 z-50 border-b border-mango/15 bg-[#fff8f1]/92 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-lg items-center justify-between px-4">
-        <Logo to={APP_BASE} />
-        <div className="flex items-center gap-2">
+    <header
+      className={`sticky top-0 z-50 pt-[env(safe-area-inset-top)] backdrop-blur-md transition-colors ${
+        onBrowse
+          ? 'border-b border-mango/10 bg-[#fff8f1]/88'
+          : 'border-b border-line/60 bg-paper/92'
+      }`}
+    >
+      <div
+        className={`mx-auto flex max-w-lg items-center justify-between gap-2 px-4 ${
+          onBrowse ? 'min-h-14 py-2' : 'h-14'
+        }`}
+      >
+        <div className="min-w-0 flex-1">
+          <Logo to={APP_BASE} />
+          {onBrowse && (
+            <p className="mt-0.5 truncate pl-[2.65rem] text-[10px] font-bold uppercase tracking-[0.14em] text-mango-deep sm:pl-[2.85rem]">
+              Someone’s got you
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
           {!standalone && (
-            <Link to="/" className="text-xs font-semibold text-muted hover:text-ink">
+            <Link
+              to="/"
+              className="hidden rounded-full px-2.5 py-2 text-xs font-semibold text-muted hover:bg-mist hover:text-ink sm:inline"
+            >
               Website
             </Link>
           )}
           <Link
             to={appPath('/find-order')}
-            className="text-xs font-semibold text-muted hover:text-ink"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-soft transition hover:bg-mango/10 hover:text-ink"
+            aria-label="Track order"
           >
-            Track
+            <TrackIcon />
           </Link>
           <Link
             to={appPath('/cart')}
-            className="relative rounded-full bg-mango/12 px-3 py-2 text-sm font-semibold text-mango-deep ring-1 ring-mango/20"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-mango-deep transition hover:bg-mango/15 sm:w-auto sm:gap-1.5 sm:bg-mango/12 sm:px-3 sm:ring-1 sm:ring-mango/20"
+            aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
           >
-            Cart
+            <CartIcon />
+            <span className="hidden text-sm font-semibold sm:inline">Cart</span>
             {itemCount > 0 && (
               <motion.span
                 key={itemCount}
                 initial={{ scale: 0.6, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={springSnap}
-                className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white"
+                className="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white sm:static sm:ml-0.5"
               >
                 {itemCount}
               </motion.span>

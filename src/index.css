@@ -182,7 +182,8 @@
     .marquee,
     .ken-burns,
     .pulse-soft,
-    .page-enter {
+    .page-enter,
+    .how-story-fill {
       animation: none !important;
     }
   }
@@ -271,5 +272,14 @@
   }
   to {
     transform: translateX(-50%);
+  }
+}
+
+@keyframes howStoryFill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
   }
 }

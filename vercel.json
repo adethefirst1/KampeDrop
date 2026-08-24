@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/vendor", "destination": "/vendor.html" },
+    { "source": "/vendor/:path*", "destination": "/vendor.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

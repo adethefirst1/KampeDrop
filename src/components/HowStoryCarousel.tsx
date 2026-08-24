@@ -1,17 +1,18 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useReducedMotion } from 'motion/react'
-import { slowFloatTransition } from '../motion/tokens'
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+  type PanInfo,
+} from 'motion/react'
+import { Reveal } from './motion'
+import { easeOut, slowFloatTransition } from '../motion/tokens'
 
 /**
- * Homepage “How it works” — same scroll-morph stack as category grocery cards.
- * SVG doodles only (no photos).
+ * Homepage “How it works” — a lived-in story stage.
+ * Same grocery-card color family as categories; different verb (swipe / breathe).
+ * Feeling first: full wash, honest progress, room for the beat to sit.
  */
 
 type StepId = 'order' | 'confirm' | 'track' | 'secure'
@@ -20,16 +21,14 @@ type StoryBeat = {
   id: StepId
   n: string
   title: string
-  shortTitle: string
   emotion: string
   body: string
-  tag: string
-  chips: string[]
-  bg: string
+  whisper: string
+  wash: string
   fg: string
   muted: string
-  badge: string
-  chipBg: string
+  accent: string
+  glow: string
 }
 
 const BEATS: StoryBeat[] = [
@@ -37,128 +36,57 @@ const BEATS: StoryBeat[] = [
     id: 'order',
     n: '01',
     title: 'You ask.',
-    shortTitle: 'Ask',
-    emotion: 'Hungry evening. Empty shelf. Quiet worry.',
-    body: 'From your Badagry home, you tap a vetted kitchen, mart, or pharmacy — not a stranger in a chat.',
-    tag: 'The wanting',
-    chips: ['Food', 'Mart', 'Pharmacy', 'Near you'],
-    bg: '#EDE4F5',
+    emotion: 'Hungry evening. Empty shelf. That quiet worry.',
+    body: 'From your Badagry home, tap a kitchen, mart, or pharmacy — not a stranger in a chat.',
+    whisper: 'The wanting',
+    wash: '#EDE4F5',
     fg: '#1A120C',
     muted: 'rgba(26,18,12,0.62)',
-    badge: 'rgba(26,18,12,0.08)',
-    chipBg: '#B85A1C',
+    accent: '#B85A1C',
+    glow: 'rgba(184,90,28,0.22)',
   },
   {
     id: 'confirm',
     n: '02',
     title: 'We answer.',
-    shortTitle: 'Answer',
     emotion: 'No silence. No “we go check”.',
-    body: 'Confirmation lands now. Your passkey waits. If you pay ahead, escrow holds it safe.',
-    tag: 'The relief',
-    chips: ['Instant', 'Passkey', 'Escrow'],
-    bg: '#D9ECF7',
+    body: 'Confirmation lands now. Your passkey waits. Pay ahead and escrow holds it safe.',
+    whisper: 'The relief',
+    wash: '#D9ECF7',
     fg: '#0B1C22',
     muted: 'rgba(11,28,34,0.62)',
-    badge: 'rgba(11,28,34,0.08)',
-    chipBg: '#0F2E34',
+    accent: '#0F2E34',
+    glow: 'rgba(15,46,52,0.18)',
   },
   {
     id: 'track',
     n: '03',
     title: 'You watch.',
-    shortTitle: 'Watch',
     emotion: 'Kitchen heat → Expressway wind → your gate.',
     body: 'Live stages, not guesswork. Preparing. On the way. Almost home.',
-    tag: 'The journey',
-    chips: ['Preparing', 'On the way', 'At gate'],
-    bg: '#F5EFC8',
+    whisper: 'The journey',
+    wash: '#F5EFC8',
     fg: '#0A2A26',
     muted: 'rgba(10,42,38,0.62)',
-    badge: 'rgba(10,42,38,0.08)',
-    chipBg: '#0C6560',
+    accent: '#0C6560',
+    glow: 'rgba(12,101,96,0.2)',
   },
   {
     id: 'secure',
     n: '04',
     title: 'We stand.',
-    shortTitle: 'Stand',
     emotion: 'Handed over — or made right.',
-    body: 'That’s the KampeDrop Guarantee. Wrong, late, missing: we don’t vanish. We fix it.',
-    tag: 'The promise',
-    chips: ['Guarantee', 'Make it right', 'Human'],
-    bg: '#E6F0E8',
+    body: 'Wrong, late, missing: we don’t vanish. That’s the KampeDrop Guarantee.',
+    whisper: 'The promise',
+    wash: '#E6F0E8',
     fg: '#122018',
     muted: 'rgba(18,32,24,0.62)',
-    badge: 'rgba(18,32,24,0.08)',
-    chipBg: '#2A5C38',
+    accent: '#2A5C38',
+    glow: 'rgba(42,92,56,0.22)',
   },
 ]
 
-function clamp(n: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, n))
-}
-
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t
-}
-
-function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia(query).matches : false,
-  )
-
-  useEffect(() => {
-    const mql = window.matchMedia(query)
-    const onChange = () => setMatches(mql.matches)
-    onChange()
-    mql.addEventListener('change', onChange)
-    return () => mql.removeEventListener('change', onChange)
-  }, [query])
-
-  return matches
-}
-
-function useStackProgress(
-  sectionRef: RefObject<HTMLElement | null>,
-  enabled: boolean,
-) {
-  const [progress, setProgress] = useState(0)
-  const raf = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (!enabled) return
-    const section = sectionRef.current
-    if (!section) return
-
-    const update = () => {
-      raf.current = null
-      const rect = section.getBoundingClientRect()
-      const total = section.offsetHeight - window.innerHeight
-      if (total <= 0) {
-        setProgress(0)
-        return
-      }
-      setProgress(clamp(-rect.top / total, 0, 1))
-    }
-
-    const onScroll = () => {
-      if (raf.current != null) return
-      raf.current = window.requestAnimationFrame(update)
-    }
-
-    update()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll)
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', onScroll)
-      if (raf.current != null) window.cancelAnimationFrame(raf.current)
-    }
-  }, [sectionRef, enabled])
-
-  return progress
-}
+const AUTO_MS = 5800
 
 function SceneArt({
   id,
@@ -173,202 +101,195 @@ function SceneArt({
 }) {
   return (
     <motion.svg
-      viewBox="0 0 320 200"
+      viewBox="0 0 320 220"
       className={className}
       fill="none"
       aria-hidden
       animate={
-        reduce ? undefined : { y: [0, -4, 0], transition: slowFloatTransition }
+        reduce ? undefined : { y: [0, -5, 0], transition: slowFloatTransition }
       }
     >
-      <ellipse cx="160" cy="178" rx="110" ry="12" fill={accent} opacity="0.12" />
+      <ellipse cx="160" cy="198" rx="118" ry="14" fill={accent} opacity="0.14" />
+      <circle cx="250" cy="42" r="56" fill={accent} opacity="0.1" />
+      <circle cx="48" cy="160" r="36" fill={accent} opacity="0.08" />
 
       {id === 'order' && (
         <>
-          <circle cx="240" cy="40" r="48" fill={accent} opacity="0.14" />
-          <circle cx="118" cy="58" r="22" stroke={accent} strokeWidth="3" />
+          <circle cx="118" cy="58" r="24" stroke={accent} strokeWidth="2.5" />
           <path
-            d="M92 90c4-16 14-24 26-24s22 8 26 24v48H92V90Z"
+            d="M90 92c4-18 15-28 28-28s24 10 28 28v52H90V92Z"
             stroke={accent}
-            strokeWidth="3"
+            strokeWidth="2.5"
             strokeLinejoin="round"
           />
           <path
-            d="M108 140v32M128 140v32"
+            d="M108 146v36M134 146v36"
             stroke={accent}
-            strokeWidth="3"
+            strokeWidth="2.5"
             strokeLinecap="round"
           />
           <motion.g
-            style={{ transformOrigin: '178px 118px' }}
+            style={{ transformOrigin: '188px 120px' }}
             animate={
               reduce
                 ? undefined
                 : {
-                    rotate: [0, -7, 0, 5, 0],
-                    transition: { duration: 2.6, repeat: Infinity },
+                    rotate: [0, -6, 0, 5, 0],
+                    transition: { duration: 2.8, repeat: Infinity },
                   }
             }
           >
             <rect
-              x="156"
-              y="92"
-              width="44"
-              height="68"
-              rx="8"
+              x="164"
+              y="94"
+              width="48"
+              height="74"
+              rx="10"
               stroke={accent}
-              strokeWidth="3"
+              strokeWidth="2.5"
               fill={accent}
-              fillOpacity="0.1"
+              fillOpacity="0.14"
             />
             <rect
-              x="164"
-              y="104"
+              x="174"
+              y="108"
               width="28"
-              height="36"
-              rx="3"
+              height="38"
+              rx="4"
               fill={accent}
-              fillOpacity="0.22"
+              fillOpacity="0.28"
             />
-            <circle cx="178" cy="150" r="3" fill={accent} />
+            <circle cx="188" cy="156" r="3.5" fill={accent} />
           </motion.g>
           {!reduce && (
             <motion.g
-              animate={{ opacity: [0.25, 1, 0.25] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.6, repeat: Infinity }}
             >
               <path
-                d="M212 78l6-12M222 88l14-4M218 102l12 10"
+                d="M224 78l7-14M236 90l16-5M232 106l14 12"
                 stroke={accent}
-                strokeWidth="2.5"
+                strokeWidth="2.25"
                 strokeLinecap="round"
               />
             </motion.g>
           )}
           <path
-            d="M70 70c0-6 4-10 8-10 3 0 5 2 6 4 1-2 3-4 6-4 4 0 8 4 8 10 0 8-14 18-14 18S70 78 70 70Z"
+            d="M64 72c0-7 5-12 10-12 3 0 6 2 7 5 1-3 4-5 7-5 5 0 10 5 10 12 0 9-17 20-17 20S64 81 64 72Z"
             fill={accent}
-            opacity="0.35"
+            opacity="0.4"
           />
         </>
       )}
 
       {id === 'confirm' && (
         <>
-          <circle cx="250" cy="46" r="40" fill={accent} opacity="0.1" />
-          <circle cx="100" cy="62" r="20" stroke={accent} strokeWidth="3" />
+          <circle cx="100" cy="62" r="22" stroke={accent} strokeWidth="2.5" />
           <path
-            d="M78 90c3-14 12-22 22-22s19 8 22 22v42H78V90Z"
+            d="M76 92c3-16 13-24 24-24s21 8 24 24v46H76V92Z"
             stroke={accent}
-            strokeWidth="3"
+            strokeWidth="2.5"
             strokeLinejoin="round"
           />
           <path
-            d="M90 132v30M110 132v30"
+            d="M90 140v32M112 140v32"
             stroke={accent}
-            strokeWidth="3"
+            strokeWidth="2.5"
             strokeLinecap="round"
           />
           <motion.g
-            style={{ transformOrigin: '210px 110px' }}
+            style={{ transformOrigin: '214px 112px' }}
             animate={
               reduce
                 ? undefined
                 : {
-                    scale: [0.88, 1.06, 1],
-                    rotate: [-10, 0, 0],
+                    scale: [0.9, 1.05, 1],
                     transition: {
-                      duration: 1.7,
+                      duration: 1.8,
                       repeat: Infinity,
-                      repeatDelay: 1,
+                      repeatDelay: 0.9,
                     },
                   }
             }
           >
             <rect
-              x="168"
-              y="72"
-              width="84"
-              height="84"
-              rx="18"
+              x="170"
+              y="70"
+              width="88"
+              height="88"
+              rx="20"
               stroke={accent}
-              strokeWidth="3.5"
+              strokeWidth="2.75"
               fill={accent}
-              fillOpacity="0.12"
+              fillOpacity="0.14"
             />
             <path
-              d="M188 116l16 16 32-34"
+              d="M192 116l16 16 34-36"
               stroke={accent}
-              strokeWidth="5"
+              strokeWidth="4"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </motion.g>
-          <path
-            d="M48 120h28M48 132h20"
-            stroke={accent}
-            strokeWidth="3"
-            strokeLinecap="round"
-            opacity="0.35"
-          />
         </>
       )}
 
       {id === 'track' && (
         <>
-          <circle cx="60" cy="50" r="36" fill={accent} opacity="0.12" />
           <motion.g
             animate={
               reduce
                 ? undefined
-                : { x: [0, 10, 0], transition: { duration: 2, repeat: Infinity } }
+                : {
+                    x: [0, 12, 0],
+                    transition: { duration: 2.2, repeat: Infinity },
+                  }
             }
           >
-            <circle cx="96" cy="148" r="18" stroke={accent} strokeWidth="3" />
-            <circle cx="210" cy="148" r="18" stroke={accent} strokeWidth="3" />
-            <circle cx="96" cy="148" r="5" fill={accent} opacity="0.35" />
-            <circle cx="210" cy="148" r="5" fill={accent} opacity="0.35" />
+            <circle cx="96" cy="152" r="18" stroke={accent} strokeWidth="2.5" />
+            <circle cx="214" cy="152" r="18" stroke={accent} strokeWidth="2.5" />
+            <circle cx="96" cy="152" r="5" fill={accent} opacity="0.35" />
+            <circle cx="214" cy="152" r="5" fill={accent} opacity="0.35" />
             <path
-              d="M96 148h42l24-36h34l12 36"
+              d="M96 152h46l26-38h36l14 38"
               stroke={accent}
-              strokeWidth="3"
+              strokeWidth="2.5"
               strokeLinejoin="round"
             />
             <path
-              d="M162 112h-22l-8 16"
-              stroke={accent}
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
-            <circle cx="156" cy="72" r="16" stroke={accent} strokeWidth="3" />
-            <path
-              d="M138 94c3-10 10-16 18-16s15 6 18 16v28H138V94Z"
-              stroke={accent}
-              strokeWidth="3"
-              strokeLinejoin="round"
-            />
-            <rect
-              x="184"
-              y="98"
-              width="28"
-              height="22"
-              rx="4"
-              stroke={accent}
-              strokeWidth="2.75"
-              fill={accent}
-              fillOpacity="0.15"
-            />
-            <path d="M190 98v-6h16v6" stroke={accent} strokeWidth="2.75" />
-          </motion.g>
-          {!reduce && (
-            <motion.path
-              d="M36 168h24M72 168h24M108 168h24M144 168h24M180 168h24M216 168h24M252 168h24"
+              d="M168 114h-24l-8 18"
               stroke={accent}
               strokeWidth="2.5"
               strokeLinecap="round"
-              opacity="0.28"
-              animate={{ x: [0, -36] }}
-              transition={{ duration: 1.1, repeat: Infinity, ease: 'linear' }}
+            />
+            <circle cx="158" cy="74" r="17" stroke={accent} strokeWidth="2.5" />
+            <path
+              d="M138 98c3-12 11-18 20-18s17 6 20 18v30H138V98Z"
+              stroke={accent}
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+            />
+            <rect
+              x="188"
+              y="100"
+              width="30"
+              height="24"
+              rx="5"
+              stroke={accent}
+              strokeWidth="2.25"
+              fill={accent}
+              fillOpacity="0.16"
+            />
+          </motion.g>
+          {!reduce && (
+            <motion.path
+              d="M28 176h28M68 176h28M108 176h28M148 176h28M188 176h28M228 176h28M268 176h28"
+              stroke={accent}
+              strokeWidth="2"
+              strokeLinecap="round"
+              opacity="0.3"
+              animate={{ x: [0, -40] }}
+              transition={{ duration: 1.15, repeat: Infinity, ease: 'linear' }}
             />
           )}
         </>
@@ -376,18 +297,17 @@ function SceneArt({
 
       {id === 'secure' && (
         <>
-          <circle cx="70" cy="48" r="42" fill={accent} opacity="0.12" />
-          <circle cx="112" cy="64" r="20" stroke={accent} strokeWidth="3" />
+          <circle cx="108" cy="62" r="22" stroke={accent} strokeWidth="2.5" />
           <path
-            d="M90 92c3-14 12-22 22-22s19 8 22 22v40H90V92Z"
+            d="M84 92c3-16 13-24 24-24s21 8 24 24v44H84V92Z"
             stroke={accent}
-            strokeWidth="3"
+            strokeWidth="2.5"
             strokeLinejoin="round"
           />
           <path
-            d="M102 132v30M122 132v30"
+            d="M98 138v34M118 138v34"
             stroke={accent}
-            strokeWidth="3"
+            strokeWidth="2.5"
             strokeLinecap="round"
           />
           <motion.g
@@ -395,9 +315,9 @@ function SceneArt({
               reduce
                 ? undefined
                 : {
-                    y: [0, -5, 0],
+                    y: [0, -6, 0],
                     transition: {
-                      duration: 2.4,
+                      duration: 2.5,
                       repeat: Infinity,
                       ease: 'easeInOut',
                     },
@@ -405,27 +325,27 @@ function SceneArt({
             }
           >
             <path
-              d="M210 52c26 8 40 22 40 48 0 32-26 52-40 60-14-8-40-28-40-60 0-26 14-40 40-48Z"
+              d="M214 48c28 9 44 24 44 52 0 34-28 56-44 66-16-10-44-32-44-66 0-28 16-43 44-52Z"
               stroke={accent}
-              strokeWidth="3.5"
+              strokeWidth="2.75"
               fill={accent}
-              fillOpacity="0.12"
+              fillOpacity="0.14"
               strokeLinejoin="round"
             />
             <path
-              d="M192 102l14 14 24-26"
+              d="M194 104l16 16 28-30"
               stroke={accent}
-              strokeWidth="4.5"
+              strokeWidth="3.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </motion.g>
           <path
-            d="M140 118c10 8 22 8 34 0"
+            d="M136 118c12 10 26 10 40 0"
             stroke={accent}
-            strokeWidth="3"
+            strokeWidth="2.5"
             strokeLinecap="round"
-            opacity="0.4"
+            opacity="0.45"
           />
         </>
       )}
@@ -433,293 +353,344 @@ function SceneArt({
   )
 }
 
-function ExpandedFace({
-  beat,
-  reduce,
-}: {
-  beat: StoryBeat
-  reduce: boolean
-}) {
-  return (
-    <div className="relative flex h-full flex-col justify-between p-6 sm:p-8 md:p-10 lg:p-12">
-      <div>
-        <div
-          className="grid h-12 w-12 place-items-center rounded-2xl text-sm font-extrabold ring-1 ring-ink/10 md:h-14 md:w-14 md:text-base"
-          style={{ backgroundColor: beat.badge, color: beat.chipBg }}
-        >
-          {beat.n}
-        </div>
-        <h3 className="mt-6 max-w-[11ch] font-display text-[2.4rem] font-semibold leading-[1.02] tracking-[-0.035em] sm:text-[2.85rem] md:mt-8 md:text-[3.5rem] lg:text-[4rem]">
-          {beat.title}
-        </h3>
-        <p
-          className="mt-4 max-w-lg text-base leading-relaxed md:mt-5 md:text-lg"
-          style={{ color: beat.muted }}
-        >
-          <span className="font-semibold" style={{ color: beat.chipBg }}>
-            {beat.emotion}
-          </span>{' '}
-          {beat.body}
-        </p>
-      </div>
-
-      <div className="relative mt-10 md:mt-12">
-        <div className="pointer-events-none absolute -top-28 right-0 w-[min(100%,19rem)] sm:-top-32 sm:w-[21rem] md:-top-36 md:w-[23rem]">
-          <SceneArt
-            id={beat.id}
-            accent={beat.chipBg}
-            reduce={reduce}
-            className="h-auto w-full"
-          />
-        </div>
-        <div className="flex flex-wrap gap-2 pr-32 sm:gap-2.5 sm:pr-44 md:pr-52">
-          {beat.chips.map((chip) => (
-            <span
-              key={chip}
-              className="rounded-full px-3.5 py-2 text-xs font-bold text-white md:px-4 md:text-[13px]"
-              style={{ backgroundColor: beat.chipBg }}
-            >
-              {chip}
-            </span>
-          ))}
-        </div>
-        <p
-          className="mt-5 text-[11px] font-bold uppercase tracking-[0.18em] md:text-xs"
-          style={{ color: beat.chipBg }}
-        >
-          {beat.tag}
-        </p>
-      </div>
-    </div>
-  )
+const beatContent = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.08, delayChildren: 0.06 },
+  },
+  exit: {
+    transition: { staggerChildren: 0.04, staggerDirection: -1 },
+  },
 }
 
-function CollapsedFace({ beat }: { beat: StoryBeat }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-between border border-ink/80 px-1.5 py-6 sm:py-8">
-      <div
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-xs font-extrabold"
-        style={{ backgroundColor: beat.badge, color: beat.chipBg }}
-      >
-        {beat.n}
-      </div>
-      <p
-        className="max-h-[75%] font-display text-xl font-semibold tracking-[-0.02em] md:text-2xl"
-        style={{
-          writingMode: 'vertical-rl',
-          transform: 'rotate(180deg)',
-          color: beat.fg,
-        }}
-      >
-        {beat.shortTitle}
-      </p>
-    </div>
-  )
+const beatLine = {
+  hidden: (dir: number) =>
+    ({
+      opacity: 0,
+      x: dir > 0 ? 36 : -36,
+      y: 12,
+      filter: 'blur(8px)',
+    }) as const,
+  show: {
+    opacity: 1,
+    x: 0,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: { duration: 0.55, ease: easeOut },
+  },
+  exit: (dir: number) =>
+    ({
+      opacity: 0,
+      x: dir > 0 ? -28 : 28,
+      filter: 'blur(6px)',
+      transition: { duration: 0.28, ease: easeOut },
+    }) as const,
 }
 
-function StaticHowCards() {
-  return (
-    <section className="bg-paper py-16 md:py-24">
-      <div className="container-site">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-lagoon">
-          How it works
-        </p>
-        <h2 className="mt-3 max-w-[16ch] font-display text-3xl font-semibold tracking-[-0.03em]">
-          A short story from want to door.
-        </h2>
-        <ul className="mt-10 space-y-4">
-          {BEATS.map((beat) => (
-            <li key={beat.id}>
-              <div
-                className="rounded-[1.5rem] p-5 ring-1 ring-line"
-                style={{ backgroundColor: beat.bg, color: beat.fg }}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-xs font-extrabold"
-                    style={{ backgroundColor: beat.badge, color: beat.chipBg }}
-                  >
-                    {beat.n}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="text-[10px] font-bold uppercase tracking-[0.14em]"
-                      style={{ color: beat.chipBg }}
-                    >
-                      {beat.tag}
-                    </p>
-                    <h3 className="mt-1.5 font-display text-2xl font-semibold leading-tight">
-                      {beat.title}
-                    </h3>
-                    <p className="mt-2 text-sm leading-relaxed" style={{ color: beat.muted }}>
-                      <span className="font-semibold" style={{ color: beat.chipBg }}>
-                        {beat.emotion}
-                      </span>{' '}
-                      {beat.body}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {beat.chips.slice(0, 3).map((chip) => (
-                        <span
-                          key={chip}
-                          className="rounded-full px-2.5 py-1 text-[11px] font-bold text-white"
-                          style={{ backgroundColor: beat.chipBg }}
-                        >
-                          {chip}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-        <Link to="/how" className="mt-8 inline-flex text-sm font-bold text-lagoon hover:underline">
-          Read the full flow →
-        </Link>
-      </div>
-    </section>
-  )
+const beatArt = {
+  hidden: (dir: number) =>
+    ({
+      opacity: 0,
+      x: dir > 0 ? 64 : -64,
+      scale: 0.92,
+      filter: 'blur(12px)',
+    }) as const,
+  show: {
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    filter: 'blur(0px)',
+    transition: { duration: 0.7, ease: easeOut, delay: 0.08 },
+  },
+  exit: (dir: number) =>
+    ({
+      opacity: 0,
+      x: dir > 0 ? -48 : 48,
+      scale: 0.96,
+      filter: 'blur(8px)',
+      transition: { duration: 0.3, ease: easeOut },
+    }) as const,
 }
 
 export function HowStoryCarousel() {
   const reduce = useReducedMotion()
-  const isDesktop = useMediaQuery('(min-width: 768px)')
-  const useMorph = Boolean(isDesktop && !reduce)
-  const sectionRef = useRef<HTMLElement>(null)
-  const progress = useStackProgress(sectionRef, useMorph)
+  const [index, setIndex] = useState(0)
+  const [direction, setDirection] = useState(1)
+  const [holding, setHolding] = useState(false)
 
-  const n = BEATS.length
-  const floatIndex = progress * (n - 1)
-  const active = Math.round(clamp(floatIndex, 0, n - 1))
+  const beat = BEATS[index]!
+  const prevBeat = BEATS[(index - 1 + BEATS.length) % BEATS.length]!
+  const nextBeat = BEATS[(index + 1) % BEATS.length]!
+  const paused = holding
 
-  const styles = useMemo(() => {
-    if (!useMorph) return []
-    const STRIP = 8.4
-    const PAD = 1.4
-    const t = floatIndex
+  function go(to: number, dir: number) {
+    setDirection(dir)
+    setIndex((to + BEATS.length) % BEATS.length)
+  }
 
-    const leftStack = t * STRIP
-    const openLeft = PAD + leftStack
-    const upcomingRoom = (n - 1 - t) * STRIP
-    const openWidth = Math.max(42, 100 - PAD * 2 - leftStack - upcomingRoom)
+  function next() {
+    go(index + 1, 1)
+  }
 
-    return BEATS.map((_, i) => {
-      const d = i - t
-      const open = clamp(1 - Math.abs(d), 0, 1)
-      const o = open * open * (3 - 2 * open)
+  function prev() {
+    go(index - 1, -1)
+  }
 
-      const pastLeft = PAD + i * STRIP
-      const upLeft = openLeft + openWidth + (i - t) * STRIP
+  useEffect(() => {
+    if (reduce || paused) return
+    const id = window.setInterval(() => {
+      setDirection(1)
+      setIndex((i) => (i + 1) % BEATS.length)
+    }, AUTO_MS)
+    return () => window.clearInterval(id)
+  }, [reduce, paused, index])
 
-      let left: number
-      let width: number
-
-      if (i <= t) {
-        left = lerp(pastLeft, openLeft, o)
-        width = lerp(STRIP, openWidth, o)
-      } else {
-        left = lerp(upLeft, openLeft, o)
-        width = lerp(STRIP, openWidth, o)
-      }
-
-      return {
-        open: o,
-        width: `${width}%`,
-        left: `${left}%`,
-        zIndex: Math.round(10 + i + o * 25),
-        scale: lerp(0.985, 1, o),
-        opacity: 1,
-      }
-    })
-  }, [floatIndex, n, useMorph])
-
-  if (!useMorph) {
-    return <StaticHowCards />
+  function onDragEnd(_: unknown, info: PanInfo) {
+    const { offset, velocity } = info
+    if (offset.x < -64 || velocity.x < -420) next()
+    else if (offset.x > 64 || velocity.x > 420) prev()
   }
 
   return (
     <section
-      ref={sectionRef}
-      className="relative"
-      style={{ height: `${n * 100}vh` }}
+      className="relative overflow-hidden py-16 md:py-24"
       aria-label="How it works"
     >
-      <div className="sticky top-0 h-svh overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[#f4efe6]" aria-hidden />
+      <div
+        className="pointer-events-none absolute inset-0 bg-[#f4efe6]"
+        aria-hidden
+      />
+      <motion.div
+        className="pointer-events-none absolute inset-x-0 top-1/3 h-[55%] blur-3xl"
+        animate={{ backgroundColor: beat.glow }}
+        transition={{ duration: 0.9, ease: easeOut }}
+        aria-hidden
+      />
 
-        <div className="absolute inset-0 z-10 px-2 pb-[max(2.75rem,env(safe-area-inset-bottom))] pt-[calc(4.25rem+env(safe-area-inset-top))] sm:px-3 md:px-4">
-          <div className="relative h-full w-full">
-            {BEATS.map((beat, i) => {
-              const s = styles[i]
-              if (!s) return null
-              const showExpanded = s.open > 0.42
-              return (
-                <div
-                  key={beat.id}
-                  className="absolute top-0 h-full overflow-hidden rounded-[1.5rem] sm:rounded-[1.75rem] md:rounded-[2rem]"
-                  style={{
-                    backgroundColor: beat.bg,
-                    color: beat.fg,
-                    width: s.width,
-                    left: s.left,
-                    zIndex: s.zIndex,
-                    opacity: s.opacity,
-                    transform: `scale(${s.scale})`,
-                    transformOrigin: 'left center',
-                    boxShadow:
-                      s.open > 0.5
-                        ? '0 28px 64px rgba(6,24,28,0.14)'
-                        : '0 10px 28px rgba(6,24,28,0.08)',
-                  }}
-                  aria-current={active === i ? 'true' : undefined}
-                >
-                  {showExpanded ? (
-                    <ExpandedFace beat={beat} reduce={Boolean(reduce)} />
-                  ) : (
-                    <CollapsedFace beat={beat} />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[calc(4.5rem+env(safe-area-inset-top))] sm:px-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-lagoon md:text-xs">
+      <div className="container-site relative">
+        <Reveal className="max-w-xl">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-lagoon">
             How it works
           </p>
-          <p className="mt-0.5 text-sm font-semibold text-ink/80">
-            Scroll — each scene opens
+          <h2 className="mt-3 font-display text-3xl font-semibold tracking-[-0.03em] text-ink md:text-[2.65rem] md:leading-[1.08]">
+            A short story from want to door.
+          </h2>
+          <p className="mt-3 text-base leading-relaxed text-muted">
+            Four beats. One promise. Let it breathe — or swipe when you’re ready.
           </p>
+        </Reveal>
+      </div>
+
+      {/* Edge-to-edge stage — same posture as category doors */}
+      <div
+        className="relative mt-9 px-2 sm:mt-11 sm:px-3 md:px-4"
+        onPointerDown={() => setHolding(true)}
+        onPointerUp={() => setHolding(false)}
+        onPointerCancel={() => setHolding(false)}
+        onPointerLeave={() => setHolding(false)}
+      >
+        <div className="relative">
+          {/* Neighbour peeks — the story spans the road */}
+          <div
+            className="pointer-events-none absolute inset-y-3 left-0 hidden w-[4.5%] overflow-hidden rounded-l-[1.25rem] md:block"
+            style={{ backgroundColor: prevBeat.wash }}
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-y-3 right-0 hidden w-[4.5%] overflow-hidden rounded-r-[1.25rem] md:block"
+            style={{ backgroundColor: nextBeat.wash }}
+            aria-hidden
+          />
+
+          <motion.div
+            className="relative z-10 overflow-hidden rounded-[1.5rem] sm:rounded-[1.75rem] md:mx-[3.5%] md:rounded-[2rem]"
+            animate={{ backgroundColor: beat.wash }}
+            transition={{ duration: 0.7, ease: easeOut }}
+            style={{
+              color: beat.fg,
+              boxShadow: '0 28px 64px rgba(6,24,28,0.14)',
+            }}
+          >
+            <div className="relative z-20 px-5 pt-5 sm:px-8 sm:pt-6 md:px-10 md:pt-7 lg:px-14">
+              <div
+                className="flex gap-2.5 md:gap-3"
+                role="tablist"
+                aria-label="Story beats"
+              >
+                {BEATS.map((b, i) => {
+                  const done = i < index
+                  const active = i === index
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      aria-label={`${b.n} ${b.whisper}`}
+                      onClick={() => go(i, i > index ? 1 : -1)}
+                      className="group flex flex-1 flex-col gap-2"
+                    >
+                      <span
+                        className="relative h-[3px] w-full overflow-hidden rounded-full"
+                        style={{
+                          backgroundColor: done
+                            ? beat.accent
+                            : 'rgba(6,24,28,0.14)',
+                        }}
+                      >
+                        {active ? (
+                          <span
+                            key={`fill-${index}`}
+                            className="how-story-fill absolute inset-0 origin-left rounded-full"
+                            style={{
+                              backgroundColor: beat.accent,
+                              transformOrigin: 'left center',
+                              ...(reduce
+                                ? { transform: 'scaleX(1)' }
+                                : {
+                                    animation: `howStoryFill ${AUTO_MS}ms linear forwards`,
+                                    animationPlayState: paused
+                                      ? 'paused'
+                                      : 'running',
+                                  }),
+                            }}
+                          />
+                        ) : null}
+                      </span>
+                      <span
+                        className={`hidden text-left text-[10px] font-bold uppercase tracking-[0.14em] md:block ${
+                          active
+                            ? 'opacity-90'
+                            : 'opacity-35 group-hover:opacity-60'
+                        }`}
+                        style={{ color: active ? beat.accent : beat.fg }}
+                      >
+                        {b.whisper}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <AnimatePresence initial={false} custom={direction} mode="wait">
+              <motion.article
+                key={beat.id}
+                custom={direction}
+                variants={reduce ? undefined : beatContent}
+                initial={reduce ? { opacity: 0 } : 'hidden'}
+                animate={reduce ? { opacity: 1 } : 'show'}
+                exit={reduce ? { opacity: 0 } : 'exit'}
+                drag={reduce ? false : 'x'}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.1}
+                onDragEnd={onDragEnd}
+                className="relative cursor-grab touch-pan-y select-none active:cursor-grabbing"
+                aria-roledescription="slide"
+                aria-label={`${beat.title}. ${beat.emotion}`}
+              >
+                <div
+                  className="pointer-events-none absolute -right-8 top-0 h-[70%] w-[45%] rounded-full opacity-90 blur-3xl"
+                  style={{ backgroundColor: beat.glow }}
+                  aria-hidden
+                />
+                <div
+                  className="pointer-events-none absolute -bottom-20 -left-12 h-56 w-56 rounded-[40%] opacity-70 blur-3xl"
+                  style={{ backgroundColor: beat.glow }}
+                  aria-hidden
+                />
+
+                <div className="relative grid min-h-[28rem] items-center gap-8 px-5 pb-8 pt-6 sm:min-h-[30rem] sm:px-8 sm:pb-10 md:min-h-[32rem] md:grid-cols-[1.05fr_0.95fr] md:gap-10 md:px-10 md:pb-12 md:pt-8 lg:min-h-[34rem] lg:gap-14 lg:px-14">
+                  <motion.div
+                    custom={direction}
+                    variants={reduce ? undefined : beatLine}
+                    className="relative z-10"
+                  >
+                    <p
+                      className="text-[11px] font-bold uppercase tracking-[0.18em] md:hidden"
+                      style={{ color: beat.accent }}
+                    >
+                      {beat.n} · {beat.whisper}
+                    </p>
+                    <h3 className="mt-3 max-w-[10ch] font-display text-[2.85rem] font-semibold leading-[0.98] tracking-[-0.04em] sm:text-[3.4rem] md:mt-0 md:text-[3.9rem] lg:text-[4.35rem]">
+                      {beat.title}
+                    </h3>
+                    <p
+                      className="mt-5 max-w-[22ch] text-lg font-semibold leading-snug md:text-[1.4rem]"
+                      style={{ color: beat.accent }}
+                    >
+                      {beat.emotion}
+                    </p>
+                    <p
+                      className="mt-3 max-w-md text-[15px] leading-relaxed md:text-base"
+                      style={{ color: beat.muted }}
+                    >
+                      {beat.body}
+                    </p>
+                  </motion.div>
+
+                  <motion.div
+                    custom={direction}
+                    variants={reduce ? undefined : beatArt}
+                    className="relative flex items-center justify-center md:justify-end"
+                  >
+                    <SceneArt
+                      id={beat.id}
+                      accent={beat.accent}
+                      reduce={Boolean(reduce)}
+                      className="h-auto w-full max-w-[20rem] sm:max-w-[23rem] md:max-w-[26rem] lg:max-w-[28rem]"
+                    />
+                  </motion.div>
+                </div>
+              </motion.article>
+            </AnimatePresence>
+
+            <div className="absolute bottom-5 right-5 z-20 flex gap-2 sm:bottom-7 sm:right-7 md:bottom-8 md:right-8">
+              <button
+                type="button"
+                onClick={prev}
+                className="grid h-11 w-11 place-items-center rounded-full bg-ink/8 text-ink/70 backdrop-blur-sm transition hover:bg-ink/14 hover:text-ink"
+                aria-label="Previous beat"
+              >
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden>
+                  <path
+                    d="M10 3L5 8l5 5"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={next}
+                className="grid h-11 w-11 place-items-center rounded-full bg-ink text-dusk transition hover:bg-ink-soft"
+                aria-label="Next beat"
+              >
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden>
+                  <path
+                    d="M6 3l5 5-5 5"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          </motion.div>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
-          <Link
-            to="/how"
-            className="pointer-events-auto text-xs font-bold text-ink/70 underline-offset-2 hover:text-ink hover:underline"
-          >
-            Read the full flow →
-          </Link>
-          <div
-            className="flex items-center gap-2 rounded-full bg-ink/70 px-3 py-2 backdrop-blur-md"
-            role="tablist"
-            aria-label="Story progress"
-          >
-            {BEATS.map((beat, i) => {
-              const on = i === active
-              return (
-                <span
-                  key={beat.id}
-                  role="tab"
-                  aria-selected={on}
-                  className={`h-1.5 rounded-full transition-[width,background-color] duration-300 ${
-                    on ? 'w-6 bg-dusk' : 'w-1.5 bg-white/35'
-                  }`}
-                />
-              )
-            })}
-          </div>
+        <div className="container-site">
+          <Reveal className="mt-8 text-center">
+            <Link
+              to="/how"
+              className="inline-flex text-sm font-bold text-lagoon hover:underline"
+            >
+              Read the full flow →
+            </Link>
+          </Reveal>
         </div>
       </div>
     </section>

@@ -62,10 +62,10 @@ const vendorSteps: Record<Platform, { title: string; items: string[] }> = {
   ios: {
     title: 'Put the board on your iPhone',
     items: [
-      'Open your board in Safari (URL starts with /vendor).',
-      'Tap the Share button at the bottom of Safari.',
-      'Scroll and tap Add to Home Screen.',
-      'Name it KD Vendor, tap Add. That icon opens the station — not customer ordering.',
+      'Delete any old KampeDrop icon from your home screen first (same box logo without the gold bar).',
+      'Open your board in Safari — address must include /vendor.',
+      'Tap Share → Add to Home Screen. The name should say KD Vendor.',
+      'Tap Add. You want the icon with the gold bar — that opens the station, not ordering.',
     ],
   },
   android: {
@@ -74,7 +74,7 @@ const vendorSteps: Record<Platform, { title: string; items: string[] }> = {
       'Open the board in Chrome (address must include /vendor). Hard-refresh once.',
       'Tap Install below, or Chrome ⋮ → Install app. The dialog should say KD Vendor — not KampeDrop.',
       'If it still says KampeDrop / opens ordering: remove that icon, clear the site, then install again from /vendor.',
-      'Open the new KD Vendor icon — steady station, Orders first.',
+      'Open the new KD Vendor icon (gold bar) — steady station, Orders first.',
     ],
   },
   desktop: {
@@ -189,6 +189,9 @@ export function InstallPrompt({
           ? 'Install app'
           : 'How to install'
 
+  const iconSrc =
+    audience === 'vendor' ? '/icons/icon-vendor-192.png' : '/icons/icon-192.png'
+
   if (compact) {
     return (
       <>
@@ -221,7 +224,7 @@ export function InstallPrompt({
         >
           <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-2 rounded-2xl border border-white/10 bg-ink px-3 py-3 text-white shadow-[0_12px_40px_rgba(14,28,24,0.4)] sm:gap-3 sm:px-4 sm:py-3.5">
             <img
-              src="/icons/icon-192.png"
+              src={iconSrc}
               alt=""
               className="h-10 w-10 shrink-0 rounded-xl sm:h-11 sm:w-11"
             />
@@ -285,6 +288,9 @@ export function AppGuideSheet({
   )
   const [mounted, setMounted] = useState(false)
   const isVendor = audience === 'vendor'
+  const sheetIcon = isVendor
+    ? '/icons/icon-vendor-192.png'
+    : '/icons/icon-192.png'
 
   useEffect(() => {
     setMounted(true)
@@ -345,7 +351,7 @@ export function AppGuideSheet({
           >
             <div className="flex shrink-0 items-start gap-3 border-b border-line/60 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
               <img
-                src="/icons/icon-192.png"
+                src={sheetIcon}
                 alt=""
                 className="h-11 w-11 shrink-0 rounded-2xl sm:h-12 sm:w-12"
               />
@@ -457,9 +463,10 @@ export function AppGuideSheet({
 
                   {isVendor && (
                     <div className="rounded-2xl border border-lagoon/20 bg-lagoon/8 px-4 py-3 text-sm text-lagoon-deep">
-                      Hard-refresh this vendor page first. If an old KampeDrop icon still
-                      opens ordering, remove it, then install again — you want the{' '}
-                      <span className="font-bold">KD Vendor</span> icon.
+                      On iPhone: delete the old <span className="font-bold">KampeDrop</span>{' '}
+                      icon first, then add again from <span className="font-bold">/vendor</span>.
+                      You want <span className="font-bold">KD Vendor</span> with the gold bar —
+                      not the orange-dot order app.
                     </div>
                   )}
 

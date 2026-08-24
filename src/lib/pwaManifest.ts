@@ -2,8 +2,10 @@ export type PwaAudience = 'customer' | 'vendor'
 
 const CUSTOMER_MANIFEST = '/manifest.webmanifest'
 const VENDOR_MANIFEST = '/manifest-vendor.webmanifest'
+const CUSTOMER_APPLE_ICON = '/apple-touch-icon.png'
+const VENDOR_APPLE_ICON = '/apple-touch-icon-vendor.png'
 
-/** Point the document at the customer or vendor install manifest. */
+/** Point the document at the customer or vendor install manifest + iOS icon. */
 export function syncPwaManifest(audience: PwaAudience) {
   if (typeof document === 'undefined') return
 
@@ -24,6 +26,21 @@ export function syncPwaManifest(audience: PwaAudience) {
       'content',
       audience === 'vendor' ? 'KD Vendor' : 'KampeDrop',
     )
+  }
+
+  // iOS home screen uses apple-touch-icon, not webmanifest icons.
+  const appleIconHref =
+    audience === 'vendor' ? VENDOR_APPLE_ICON : CUSTOMER_APPLE_ICON
+  let appleIcon = document.querySelector<HTMLLinkElement>(
+    'link[rel="apple-touch-icon"]',
+  )
+  if (!appleIcon) {
+    appleIcon = document.createElement('link')
+    appleIcon.rel = 'apple-touch-icon'
+    document.head.appendChild(appleIcon)
+  }
+  if (appleIcon.getAttribute('href') !== appleIconHref) {
+    appleIcon.setAttribute('href', appleIconHref)
   }
 }
 

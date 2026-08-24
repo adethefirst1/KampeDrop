@@ -11,8 +11,16 @@ const rootDir = fileURLToPath(new URL('.', import.meta.url))
 function stripToVendorManifest(html: string) {
   let out = html.replace(/<link[^>]*rel=["']manifest["'][^>]*>/gi, '')
   out = out.replace(
+    /<link[^>]*rel=["']apple-touch-icon["'][^>]*>/gi,
+    '',
+  )
+  out = out.replace(
     /<\/head>/i,
-    '    <link rel="manifest" href="/manifest-vendor.webmanifest" />\n  </head>',
+    [
+      '    <link rel="apple-touch-icon" href="/apple-touch-icon-vendor.png" />',
+      '    <link rel="manifest" href="/manifest-vendor.webmanifest" />',
+      '  </head>',
+    ].join('\n'),
   )
   out = out.replace(
     /(<meta name="apple-mobile-web-app-title" content=")[^"]*(")/i,
@@ -76,6 +84,7 @@ export default defineConfig({
       includeAssets: [
         'favicon.svg',
         'apple-touch-icon.png',
+        'apple-touch-icon-vendor.png',
         'icons/*.png',
         'manifest-vendor.webmanifest',
       ],
@@ -88,9 +97,10 @@ export default defineConfig({
         background_color: '#071f24',
         display: 'standalone',
         orientation: 'portrait-primary',
+        // Scope limited to /app so the customer install does not own /vendor on iOS.
         start_url: '/app',
-        scope: '/',
-        id: '/',
+        scope: '/app',
+        id: '/app',
         lang: 'en-NG',
         categories: ['food', 'shopping', 'lifestyle'],
         icons: [
@@ -122,6 +132,7 @@ export default defineConfig({
           '**/*.{js,css,html,ico,svg,woff2,webmanifest}',
           'icons/*.png',
           'apple-touch-icon.png',
+          'apple-touch-icon-vendor.png',
         ],
         globIgnores: ['**/brand/**'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,

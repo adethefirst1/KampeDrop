@@ -64,7 +64,17 @@ function StandaloneGate({ children }: { children: ReactNode }) {
     location.pathname === '/terms' ||
     location.pathname === '/work-with-us'
 
+  // Customer standalone should land in /app — never steal /vendor.
+  // If an old home-screen web clip opens `/` with the vendor apple title, send to board.
   if (isStandaloneDisplay() && marketing) {
+    const appleTitle =
+      document
+        .querySelector('meta[name="apple-mobile-web-app-title"]')
+        ?.getAttribute('content')
+        ?.toLowerCase() ?? ''
+    if (appleTitle.includes('vendor')) {
+      return <Navigate to="/vendor" replace />
+    }
     return <Navigate to={APP_BASE} replace />
   }
 

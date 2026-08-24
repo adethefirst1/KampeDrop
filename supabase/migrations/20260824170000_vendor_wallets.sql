@@ -181,7 +181,8 @@ begin
     'order_credit',
     'Escrow released — vendor share (full subtotal, 0% commission)'
   )
-  on conflict (order_id) where (type = 'order_credit')
+  on conflict (order_id)
+  where (type = 'order_credit' and order_id is not null)
   do nothing
   returning id into inserted_id;
 
@@ -519,7 +520,8 @@ begin
     'withdrawal_paid',
     coalesce(p_note, 'Ops marked bank transfer sent')
   )
-  on conflict (withdrawal_id) where (type = 'withdrawal_paid')
+  on conflict (withdrawal_id)
+  where (type = 'withdrawal_paid' and withdrawal_id is not null)
   do nothing
   returning id into inserted_id;
 

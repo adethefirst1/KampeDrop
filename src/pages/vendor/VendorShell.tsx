@@ -4,6 +4,7 @@ import { VendorInstallButton, VendorInstallTip } from '../../components/InstallP
 import { useCatalog } from '../../context/CatalogContext'
 import { useVendor } from '../../context/VendorContext'
 import { SITE } from '../../data/site'
+import { VendorLockScreen } from './VendorLockScreen'
 
 export const VENDOR_BASE = '/vendor'
 
@@ -14,8 +15,9 @@ export function vendorPath(path = ''): string {
 }
 
 export function RequireVendor({ children }: { children: ReactNode }) {
-  const { authenticated } = useVendor()
+  const { authenticated, boardLocked } = useVendor()
   if (!authenticated) return <Navigate to={vendorPath('/login')} replace />
+  if (boardLocked) return <VendorLockScreen />
   return children
 }
 
@@ -25,6 +27,7 @@ export function VendorShell() {
     vendorName,
     verificationStatus: sessionStatus,
     logout,
+    lockBoard,
     ordersForVendor,
   } = useVendor()
   const { getVendor } = useCatalog()
@@ -46,43 +49,64 @@ export function VendorShell() {
   ]
 
   return (
-    <div className="min-h-svh mist-wash text-ink">
-      <header className="sticky top-0 z-40 border-b border-line/70 bg-paper/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <div className="min-h-svh vendor-wash text-ink">
+      <header className="sticky top-0 z-40 border-b border-ink/15 bg-[#e8eceb]/92 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-lg items-center justify-between gap-3 px-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-lagoon">
-              {SITE.name} Vendor
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-dusk">
+              {SITE.name} · Board
             </p>
             <p className="truncate font-display text-lg font-bold leading-tight tracking-[-0.02em]">
               {displayName}
             </p>
+            <p className="truncate text-[11px] font-semibold text-ink-soft/80">
+              {pending > 0 && !awaitingReview
+                ? `Heat’s on — ${pending} waiting.`
+                : 'Kitchen open. Orders will come.'}
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={logout}
-            className="shrink-0 rounded-full bg-mist px-3 py-1.5 text-xs font-bold text-ink-soft"
-          >
-            Sign out
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={lockBoard}
+              className="rounded-full px-2.5 py-1.5 text-[11px] font-semibold text-ink-soft hover:bg-ink/5 hover:text-ink"
+              aria-label="Lock board"
+            >
+              Lock
+            </button>
+            <button
+              type="button"
+              onClick={logout}
+              className="rounded-full px-2.5 py-1.5 text-[11px] font-semibold text-muted hover:bg-ink/5 hover:text-ink"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
-        <nav className="mx-auto flex max-w-lg gap-1 px-4 pb-2.5" aria-label="Vendor">
+        <nav className="mx-auto flex max-w-lg gap-1 px-4 pb-2.5" aria-label="Vendor board">
           {tabs.map((tab) => {
             const active = tab.end
               ? pathname === tab.to
               : pathname.startsWith(tab.to)
+            const showPending =
+              tab.label === 'Orders' && pending > 0 && !awaitingReview
             return (
               <NavLink
                 key={tab.to}
                 to={tab.to}
                 end={tab.end}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-extrabold ${
-                  active ? 'bg-ink text-white' : 'bg-mist text-muted'
+                className={`rounded-full px-3.5 py-1.5 text-xs font-extrabold transition ${
+                  active
+                    ? 'bg-ink text-dusk shadow-[0_2px_0_rgba(6,24,28,0.35)]'
+                    : 'bg-ink/6 text-ink-soft hover:bg-ink/10'
                 }`}
               >
                 {tab.label}
-                {tab.label === 'Orders' && pending > 0 && !awaitingReview
-                  ? ` · ${pending}`
-                  : ''}
+                {showPending ? (
+                  <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-mango px-1 text-[10px] font-bold text-white">
+                    {pending}
+                  </span>
+                ) : null}
               </NavLink>
             )
           })}
@@ -90,7 +114,7 @@ export function VendorShell() {
       </header>
 
       {awaitingReview && (
-        <div className="border-b border-dusk/40 bg-dusk/90 px-4 py-3 text-ink">
+        <div className="border-b border-dusk/50 bg-dusk/85 px-4 py-3 text-ink">
           <div className="mx-auto max-w-lg">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.14em]">
               {status === 'needs_info'
@@ -125,11 +149,11 @@ export function VendorShell() {
         <Outlet />
       </main>
       <p className="pb-[max(1rem,env(safe-area-inset-bottom))] text-center text-[11px] font-semibold text-muted">
-        <Link to="/work-with-us" className="text-lagoon hover:underline">
+        <Link to="/work-with-us" className="text-ink-soft hover:text-ink hover:underline">
           Work with us
         </Link>
         {' · '}
-        <VendorInstallButton className="text-lagoon hover:underline" />
+        <VendorInstallButton className="text-ink-soft hover:text-ink hover:underline" />
       </p>
     </div>
   )

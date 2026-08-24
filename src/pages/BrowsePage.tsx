@@ -142,14 +142,14 @@ export function BrowsePage() {
             </>
           )}
 
-          <p className="relative text-[11px] font-extrabold uppercase tracking-[0.16em] text-lagoon">
+          <p className="relative text-[11px] font-extrabold uppercase tracking-[0.16em] text-mango-deep">
             {greeting} · {SERVICE_AREA}
           </p>
           <h1 className="relative mt-2 max-w-[12ch] font-display text-[2.05rem] font-semibold leading-[1.05] tracking-[-0.035em] text-ink">
             What do you need?
           </h1>
           <p className="relative mt-2 max-w-[18rem] text-sm leading-relaxed text-muted">
-            Shop with beauty — search, pick a vibe, or scroll finds nearby.
+            Someone’s got you — search, pick a vibe, or scroll finds nearby.
           </p>
 
           <label className="relative mt-4 block">

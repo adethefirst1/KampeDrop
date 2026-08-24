@@ -275,13 +275,13 @@ export function VendorSignupPage() {
 
   if (done) {
     return (
-      <div className="flex min-h-svh flex-col mist-wash text-ink">
+      <div className="flex min-h-svh flex-col vendor-wash text-ink">
         <div className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-4 py-12">
-          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-lagoon">
+          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-dusk">
             Application submitted
           </p>
           <h1 className="mt-3 font-display text-3xl font-bold tracking-[-0.03em]">
-            Application submitted — pending review
+            You’re in the queue — board stays quiet for now
           </h1>
           <div className="mt-5 rounded-[1.5rem] border-[3px] border-ink bg-dusk px-5 py-5 text-ink shadow-[5px_5px_0_#06181C]">
             <p className="text-sm font-semibold leading-relaxed">
@@ -312,7 +312,7 @@ export function VendorSignupPage() {
             className="mt-4 text-center text-sm font-bold text-lagoon hover:underline"
             onClick={() => navigate(vendorPath('/login'), { replace: true })}
           >
-            Already approved? Sign in
+            Already approved? Clock in
           </button>
         </div>
       </div>
@@ -320,23 +320,23 @@ export function VendorSignupPage() {
   }
 
   return (
-    <div className="min-h-svh mist-wash text-ink">
+    <div className="min-h-svh vendor-wash text-ink">
       <div className="mx-auto max-w-lg px-4 pb-28 pt-8">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-lagoon">
-              {SITE.name} · Partners
+            <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-dusk">
+              {SITE.name} · Station setup
             </p>
             <h1 className="mt-2 font-display text-[1.85rem] font-bold leading-tight tracking-[-0.03em]">
               {STEPS[step].title}
             </h1>
-            <p className="mt-1 text-sm font-semibold text-muted">{STEPS[step].sub}</p>
+            <p className="mt-1 text-sm font-semibold text-ink-soft">{STEPS[step].sub}</p>
           </div>
           <Link
             to={vendorPath('/login')}
-            className="shrink-0 rounded-full bg-paper px-3 py-1.5 text-xs font-bold text-muted ring-1 ring-line"
+            className="shrink-0 rounded-full bg-ink/8 px-3 py-1.5 text-xs font-bold text-ink-soft ring-1 ring-ink/15"
           >
-            Sign in
+            Clock in
           </Link>
         </div>
 
@@ -346,7 +346,7 @@ export function VendorSignupPage() {
             <div
               key={s.id}
               className={`h-1.5 flex-1 rounded-full ${
-                i <= step ? 'bg-mango' : 'bg-ink/10'
+                i <= step ? 'bg-dusk' : 'bg-ink/10'
               }`}
             />
           ))}

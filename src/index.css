@@ -20,6 +20,10 @@
   --color-palm: #2a5c38;
   --color-dusk: #efc27a;
   --color-laterite: #c4784a;
+  /* Vendor station marks */
+  --color-vendor-mark: #efc27a;
+  --color-vendor-ready: #1f8a5b;
+  --color-vendor-steel: #dce4e2;
 }
 
 @layer base {
@@ -196,6 +200,23 @@
       radial-gradient(ellipse 80% 55% at 100% 0%, rgba(230, 240, 238, 0.9), transparent 50%),
       radial-gradient(ellipse 60% 45% at 50% 100%, rgba(12, 101, 96, 0.08), transparent 55%),
       linear-gradient(180deg, #f7f1e8 0%, var(--color-mist) 42%, #e8f0ee 100%);
+  }
+
+  /* Vendor board — cooler steel mist, dusk flecks, no coral hunger glow */
+  .vendor-wash {
+    background:
+      radial-gradient(ellipse 85% 50% at 0% -5%, rgba(6, 24, 28, 0.08), transparent 55%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(239, 194, 122, 0.16), transparent 50%),
+      radial-gradient(ellipse 50% 35% at 80% 100%, rgba(42, 92, 56, 0.1), transparent 55%),
+      linear-gradient(180deg, #e8eceb 0%, #e2e8e7 45%, #dce4e2 100%);
+  }
+
+  .vendor-mark {
+    color: var(--color-dusk);
+  }
+
+  .vendor-ready {
+    color: var(--color-ok);
   }
 
   .wave-line {

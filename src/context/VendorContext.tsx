@@ -31,6 +31,8 @@ type VendorSession = {
   vendorId: string
   accessToken: string
   name: string
+  /** Business phone used at login — needed to re-verify PIN on unlock */
+  phone: string
   verificationStatus: VerificationStatus | string
   active: boolean
   signedInAt: string
@@ -42,12 +44,17 @@ type VendorContextValue = {
   vendorId: string | null
   accessToken: string | null
   vendorName: string | null
+  vendorPhone: string | null
   verificationStatus: string | null
   vendorActive: boolean | null
   authenticated: boolean
+  /** Session exists but board is locked until PIN unlock */
+  boardLocked: boolean
   ordersLoading: boolean
   ordersError: string | null
   login: (phone: string, pin: string) => Promise<ActionResult>
+  unlockBoard: (pin: string) => Promise<ActionResult>
+  lockBoard: () => void
   logout: () => void
   refreshOrders: () => Promise<void>
   orders: VendorOrder[]
@@ -96,7 +103,12 @@ function loadSession(): VendorSession | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as VendorSession
     // Pre-token sessions are invalid — portal RPCs need access_token
-    if (parsed?.vendorId && parsed?.accessToken) return parsed
+    if (parsed?.vendorId && parsed?.accessToken) {
+      return {
+        ...parsed,
+        phone: typeof parsed.phone === 'string' ? parsed.phone : '',
+      }
+    }
   } catch {
     /* ignore */
   }
@@ -134,6 +146,8 @@ function persistOrderPatch(order: VendorOrder) {
 
 export function VendorProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<VendorSession | null>(() => loadSession())
+  /** Cold open with a saved session starts locked — PIN to open the board. */
+  const [boardLocked, setBoardLocked] = useState(() => Boolean(loadSession()))
   const [orders, setOrders] = useState<VendorOrder[]>(() => loadOrders())
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [ordersError, setOrdersError] = useState<string | null>(null)
@@ -155,6 +169,27 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     }
   }, [orders])
 
+  // Lock the board as soon as the app/tab is hidden or backgrounded.
+  useEffect(() => {
+    if (!session?.accessToken) {
+      setBoardLocked(false)
+      return
+    }
+
+    const lock = () => setBoardLocked(true)
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') lock()
+    }
+
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pagehide', lock)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pagehide', lock)
+    }
+  }, [session?.accessToken])
+
   const refreshOrders = useCallback(async () => {
     const token = session?.accessToken
     if (!token) return
@@ -168,6 +203,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
       setOrdersError(result.reason)
       if (/invalid vendor access token/i.test(result.reason)) {
         setSession(null)
+        setBoardLocked(false)
       }
       return
     }
@@ -176,7 +212,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
   }, [session?.accessToken])
 
   useEffect(() => {
-    if (!session?.accessToken) return
+    if (!session?.accessToken || boardLocked) return
     void refreshOrders()
     const id = window.setInterval(() => void refreshOrders(), 20_000)
     const onFocus = () => void refreshOrders()
@@ -185,7 +221,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
       window.clearInterval(id)
       window.removeEventListener('focus', onFocus)
     }
-  }, [session?.accessToken, refreshOrders])
+  }, [session?.accessToken, boardLocked, refreshOrders])
 
   const login = useCallback(async (phone: string, pin: string) => {
     if (!phone.trim()) return { ok: false as const, reason: 'Enter your business phone.' }
@@ -200,15 +236,55 @@ export function VendorProvider({ children }: { children: ReactNode }) {
       vendorId: result.vendor.id,
       accessToken: result.vendor.access_token,
       name: result.vendor.name,
+      phone: phone.trim(),
       verificationStatus: result.vendor.verification_status,
       active: result.vendor.active,
       signedInAt: new Date().toISOString(),
     })
+    setBoardLocked(false)
     return { ok: true as const }
   }, [])
 
+  const lockBoard = useCallback(() => {
+    if (session?.accessToken) setBoardLocked(true)
+  }, [session?.accessToken])
+
+  const unlockBoard = useCallback(
+    async (pin: string) => {
+      if (!session?.accessToken) {
+        return { ok: false as const, reason: 'Sign in again to open the board.' }
+      }
+      if (!/^\d{4}$/.test(pin.trim())) {
+        return { ok: false as const, reason: 'PIN must be exactly 4 digits.' }
+      }
+      if (!session.phone) {
+        return {
+          ok: false as const,
+          reason: 'This session is missing a phone. Sign out and clock in again.',
+        }
+      }
+
+      const result = await vendorLogin(session.phone, pin.trim())
+      if (!result.ok) return { ok: false as const, reason: result.reason }
+
+      setSession({
+        vendorId: result.vendor.id,
+        accessToken: result.vendor.access_token,
+        name: result.vendor.name,
+        phone: session.phone,
+        verificationStatus: result.vendor.verification_status,
+        active: result.vendor.active,
+        signedInAt: new Date().toISOString(),
+      })
+      setBoardLocked(false)
+      return { ok: true as const }
+    },
+    [session],
+  )
+
   const logout = useCallback(() => {
     setSession(null)
+    setBoardLocked(false)
     setOrders([])
     setOrdersError(null)
   }, [])
@@ -278,6 +354,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
   const vendorId = session?.vendorId ?? null
   const accessToken = session?.accessToken ?? null
   const vendorName = session?.name ?? null
+  const vendorPhone = session?.phone || null
   const verificationStatus = session?.verificationStatus ?? null
   const vendorActive = session?.active ?? null
   const ordersForVendor = useMemo(
@@ -290,12 +367,16 @@ export function VendorProvider({ children }: { children: ReactNode }) {
       vendorId,
       accessToken,
       vendorName,
+      vendorPhone,
       verificationStatus,
       vendorActive,
       authenticated: Boolean(vendorId && accessToken),
+      boardLocked: Boolean(vendorId && accessToken && boardLocked),
       ordersLoading,
       ordersError,
       login,
+      unlockBoard,
+      lockBoard,
       logout,
       refreshOrders,
       orders,
@@ -310,11 +391,15 @@ export function VendorProvider({ children }: { children: ReactNode }) {
       vendorId,
       accessToken,
       vendorName,
+      vendorPhone,
       verificationStatus,
       vendorActive,
+      boardLocked,
       ordersLoading,
       ordersError,
       login,
+      unlockBoard,
+      lockBoard,
       logout,
       refreshOrders,
       orders,

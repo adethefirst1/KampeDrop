@@ -162,7 +162,7 @@ function AppHeader() {
   const standalone = isStandaloneDisplay()
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line/70 bg-paper/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-mango/15 bg-[#fff8f1]/92 pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-lg items-center justify-between px-4">
         <Logo to={APP_BASE} />
         <div className="flex items-center gap-2">
@@ -179,7 +179,7 @@ function AppHeader() {
           </Link>
           <Link
             to={appPath('/cart')}
-            className="relative rounded-full bg-mist px-3 py-2 text-sm font-semibold"
+            className="relative rounded-full bg-mango/12 px-3 py-2 text-sm font-semibold text-mango-deep ring-1 ring-mango/20"
           >
             Cart
             {itemCount > 0 && (

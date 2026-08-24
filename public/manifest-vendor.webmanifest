@@ -1,9 +1,9 @@
 {
   "name": "KampeDrop Vendor",
   "short_name": "KD Vendor",
-  "description": "Vendor board for KampeDrop — orders, menu, and business in Badagry.",
+  "description": "Vendor board for KampeDrop — steady station for orders, menu, and business in Badagry.",
   "theme_color": "#06181c",
-  "background_color": "#e6f0ee",
+  "background_color": "#dce4e2",
   "display": "standalone",
   "orientation": "portrait-primary",
   "start_url": "/vendor",

@@ -42,17 +42,17 @@ export function VendorLoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col mist-wash text-ink">
+    <div className="flex min-h-svh flex-col vendor-wash text-ink">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10">
-        <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-lagoon">
-          {SITE.name} Vendor
+        <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-dusk">
+          {SITE.name} · Board
         </p>
         <h1 className="mt-3 font-display text-3xl font-bold tracking-[-0.03em]">
-          Sign in to your board
+          Clock in to your board
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted">
-          Use the phone and 4-digit PIN from your registration. Enter digits after +234
-          (skip the leading 0).
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          Steady hands. Clear queue. Enter the phone and 4-digit PIN from registration
+          (digits after +234 — skip the leading 0).
         </p>
 
         <form onSubmit={onSubmit} className="mt-8 space-y-4">
@@ -65,7 +65,7 @@ export function VendorLoginPage() {
             </div>
           </label>
           <label className="block">
-            <span className="text-xs font-bold uppercase tracking-wide text-muted">PIN</span>
+            <span className="text-xs font-bold uppercase tracking-wide text-muted">Board PIN</span>
             <input
               className="field mt-1.5 tracking-[0.3em]"
               type="password"
@@ -84,23 +84,27 @@ export function VendorLoginPage() {
               {error}
             </p>
           )}
-          <button type="submit" className="btn-primary w-full" disabled={busy}>
-            {busy ? 'Signing in…' : 'Open board →'}
+          <button
+            type="submit"
+            className="inline-flex w-full items-center justify-center rounded-full bg-ink px-4 py-3.5 text-sm font-extrabold text-dusk shadow-[0_4px_0_rgba(6,24,28,0.4)] transition hover:bg-ink-soft disabled:opacity-70"
+            disabled={busy}
+          >
+            {busy ? 'Opening…' : 'Open board →'}
           </button>
         </form>
 
         <div className="mt-8 space-y-2 text-center text-sm font-semibold text-muted">
           <p>
             New here?{' '}
-            <Link to={vendorPath('/signup')} className="text-lagoon hover:underline">
+            <Link to={vendorPath('/signup')} className="text-ink hover:underline">
               Register your business
             </Link>
           </p>
           <p>
-            <VendorInstallButton className="text-lagoon hover:underline" />
-            <span className="text-muted"> — add the board to your home screen</span>
+            <VendorInstallButton className="text-ink hover:underline" />
+            <span className="text-muted"> — put the board on your home screen</span>
           </p>
-          <a href={helpUrl} target="_blank" rel="noreferrer" className="text-lagoon hover:underline">
+          <a href={helpUrl} target="_blank" rel="noreferrer" className="text-ink-soft hover:underline">
             Need help? WhatsApp us
           </a>
           <p>

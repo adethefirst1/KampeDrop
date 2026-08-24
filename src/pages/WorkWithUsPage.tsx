@@ -2,34 +2,10 @@ import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import { MarketingLayout } from '../components/layout'
 import { Reveal, Stagger, MotionItem } from '../components/motion'
-import { SITE, whatsappHelpUrl } from '../data/site'
-import { fadeUp, hoverLift, springPop, tapPress } from '../motion/tokens'
-
-const applyWhatsApp = whatsappHelpUrl(
-  `Hi KampeDrop — I want to sell from ${SITE.area}. Interested in WhatsApp orders and/or the vendor web board.`,
-)
+import { SITE } from '../data/site'
+import { fadeUp, hoverLift, tapPress } from '../motion/tokens'
 
 const channels = [
-  {
-    id: 'whatsapp',
-    eyebrow: 'Talk to us',
-    title: 'WhatsApp onboarding',
-    lead: 'Prefer a conversation? Message us and we’ll walk you through.',
-    points: [
-      'Human reply for Badagry partners',
-      'Same verification standards',
-      'Ideal if you’d rather not fill a form',
-    ],
-    tone: {
-      bg: '#EFC27A',
-      ink: '#06181C',
-      chip: '#06181C',
-      border: '#06181C',
-    },
-    cta: 'Message on WhatsApp',
-    href: applyWhatsApp,
-    external: true,
-  },
   {
     id: 'web',
     eyebrow: 'Self-serve',
@@ -39,7 +15,7 @@ const channels = [
       'Submit name, address & storefront photos',
       'We review within 24 hours when complete',
       'Customers see you only after approval',
-      'Browser board — no app download',
+      'Browser board — install to your home screen',
     ],
     tone: {
       bg: '#0C6560',
@@ -49,7 +25,25 @@ const channels = [
     },
     cta: 'Register your business',
     href: '/vendor/signup',
-    external: false,
+  },
+  {
+    id: 'signin',
+    eyebrow: 'Already approved',
+    title: 'Clock in to your board',
+    lead: 'Open your station — orders, menu, and handoff in one place.',
+    points: [
+      'Use the phone + PIN from registration',
+      'Lock when you step away — PIN to reopen',
+      'Put the board on your home screen',
+    ],
+    tone: {
+      bg: '#06181C',
+      ink: '#F3F8F6',
+      chip: '#EFC27A',
+      border: '#06181C',
+    },
+    cta: 'Sign in',
+    href: '/vendor/login',
   },
 ] as const
 
@@ -105,6 +99,20 @@ export function WorkWithUsPage() {
               we verify within 24 hours. Your business appears to customers only after
               approval.
             </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                to="/vendor/signup"
+                className="inline-flex items-center justify-center rounded-full bg-mango px-5 py-3 text-sm font-extrabold text-white shadow-[3px_3px_0_#9a4f16]"
+              >
+                Register →
+              </Link>
+              <Link
+                to="/vendor/login"
+                className="inline-flex items-center justify-center rounded-full border-[3px] border-dusk bg-transparent px-5 py-3 text-sm font-extrabold text-dusk hover:bg-dusk/10"
+              >
+                Sign in
+              </Link>
+            </div>
           </Reveal>
         </div>
       </section>
@@ -117,10 +125,10 @@ export function WorkWithUsPage() {
               Partner pathways
             </p>
             <h2 className="mt-3 max-w-[18ch] font-display text-3xl font-semibold tracking-[-0.03em] md:text-[2.75rem] md:leading-[1.1]">
-              How you join.
+              How you join — or clock in.
             </h2>
             <p className="mt-4 max-w-lg text-base leading-relaxed text-muted">
-              Self-serve registration or WhatsApp — same careful verification either way.
+              New partners register online. Approved kitchens and shops sign in to the board.
             </p>
           </Reveal>
 
@@ -155,23 +163,12 @@ export function WorkWithUsPage() {
                       </li>
                     ))}
                   </ul>
-                  {ch.external ? (
-                    <a
-                      href={ch.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-8 inline-flex items-center justify-center rounded-full border-[3px] border-ink bg-ink px-5 py-3 text-sm font-extrabold text-paper shadow-[3px_3px_0_rgba(2,10,12,0.35)]"
-                    >
-                      {ch.cta} →
-                    </a>
-                  ) : (
-                    <Link
-                      to={ch.href}
-                      className="mt-8 inline-flex items-center justify-center rounded-full border-[3px] border-ink bg-dusk px-5 py-3 text-sm font-extrabold text-ink shadow-[3px_3px_0_rgba(2,10,12,0.35)]"
-                    >
-                      {ch.cta} →
-                    </Link>
-                  )}
+                  <Link
+                    to={ch.href}
+                    className="mt-8 inline-flex items-center justify-center rounded-full border-[3px] border-ink bg-dusk px-5 py-3 text-sm font-extrabold text-ink shadow-[3px_3px_0_rgba(2,10,12,0.35)]"
+                  >
+                    {ch.cta} →
+                  </Link>
                 </motion.article>
               </MotionItem>
             ))}
@@ -220,27 +217,18 @@ export function WorkWithUsPage() {
               Ready to sell on these roads?
             </h2>
             <p className="mx-auto mt-4 max-w-md text-base font-semibold text-white/65">
-              Tell us your kitchen, mart, or pharmacy. We vet first — then you pick WhatsApp,
-              web board, or both.
+              Register your kitchen, mart, or pharmacy. We vet first — then you open the board.
             </p>
           </Reveal>
           <Reveal className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <motion.a
-              href={applyWhatsApp}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-primary"
-              whileHover={reduce ? undefined : hoverLift}
-              whileTap={reduce ? undefined : tapPress}
-              transition={springPop}
-            >
-              Message on WhatsApp →
-            </motion.a>
+            <Link to="/vendor/signup" className="btn-primary">
+              Register your business →
+            </Link>
             <Link
-              to="/vendor/signup"
-              className="inline-flex text-sm font-extrabold text-dusk hover:underline"
+              to="/vendor/login"
+              className="inline-flex rounded-full border-[3px] border-dusk px-5 py-3 text-sm font-extrabold text-dusk hover:bg-dusk/10"
             >
-              Or register online
+              Sign in to your board
             </Link>
           </Reveal>
         </div>

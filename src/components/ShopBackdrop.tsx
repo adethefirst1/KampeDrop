@@ -72,10 +72,10 @@ export function ShopBackdrop({
 
 function greetingLine() {
   const h = new Date().getHours()
-  if (h < 11) return 'Good morning, Badagry'
-  if (h < 16) return 'Afternoon in Badagry'
-  if (h < 20) return 'Evening in Badagry'
-  return 'Night run, Badagry'
+  if (h < 11) return 'Morning hunger · Badagry’s got you'
+  if (h < 16) return 'Afternoon craving · someone\'s got you'
+  if (h < 20) return 'Evening heat · order with ease'
+  return 'Night run · we\'ll bring it home'
 }
 
 export function shopGreeting() {

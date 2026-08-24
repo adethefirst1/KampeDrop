@@ -60,30 +60,30 @@ const customerSteps: Record<Platform, { title: string; items: string[] }> = {
 /** Prefer Add to Home Screen / Install while the vendor manifest is active (start_url /vendor). */
 const vendorSteps: Record<Platform, { title: string; items: string[] }> = {
   ios: {
-    title: 'Add your vendor board to iPhone',
+    title: 'Put the board on your iPhone',
     items: [
-      'Open your vendor board in Safari (URL starts with /vendor).',
+      'Open your board in Safari (URL starts with /vendor).',
       'Tap the Share button at the bottom of Safari.',
       'Scroll and tap Add to Home Screen.',
-      'Name it KD Vendor, tap Add. That icon opens the board — not customer ordering.',
+      'Name it KD Vendor, tap Add. That icon opens the station — not customer ordering.',
     ],
   },
   android: {
-    title: 'Install your vendor board on Android',
+    title: 'Put the board on Android',
     items: [
-      'Open the vendor board in Chrome (address must include /vendor). Hard-refresh once.',
+      'Open the board in Chrome (address must include /vendor). Hard-refresh once.',
       'Tap Install below, or Chrome ⋮ → Install app. The dialog should say KD Vendor — not KampeDrop.',
-      'If it still says KampeDrop / opens ordering: remove that icon, clear the site from Chrome app list, then install again from /vendor.',
-      'Open the new KD Vendor icon — it should land on Orders.',
+      'If it still says KampeDrop / opens ordering: remove that icon, clear the site, then install again from /vendor.',
+      'Open the new KD Vendor icon — steady station, Orders first.',
     ],
   },
   desktop: {
-    title: 'Put the vendor board on your phone',
+    title: 'Put the board on your phone',
     items: [
-      'On your phone, open the vendor board URL in Chrome or Safari.',
-      'Install / Add to Home Screen while on /vendor so the icon opens the board.',
+      'On your phone, open the board URL in Chrome or Safari.',
+      'Install / Add to Home Screen while on /vendor so the icon opens the station.',
       'On this computer, bookmark /vendor for desk use.',
-      'Sign in once on the phone icon — stay signed in on that device.',
+      'Sign in once on the phone icon — stay clocked in on that device.',
     ],
   },
 }
@@ -228,11 +228,13 @@ export function InstallPrompt({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold leading-snug">
                 {audience === 'vendor'
-                  ? 'Put your vendor board on the home screen'
+                  ? 'Put the board on your home screen'
                   : 'Put KampeDrop on your home screen'}
               </p>
               <p className="hidden text-xs text-white/60 sm:block">
-                We’ll show you the exact steps for your phone.
+                {audience === 'vendor'
+                  ? 'One tap to Orders when the kitchen is live.'
+                  : 'We’ll show you the exact steps for your phone.'}
               </p>
             </div>
             <button
@@ -349,7 +351,7 @@ export function AppGuideSheet({
               />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-lagoon">
-                  {isVendor ? 'Vendor board' : 'KampeDrop app'}
+                  {isVendor ? 'Station · Board' : 'KampeDrop app'}
                 </p>
                 <h2
                   id="app-guide-title"
@@ -372,9 +374,9 @@ export function AppGuideSheet({
               {view === 'choose' ? (
                 <div className="space-y-3">
                   <p className="text-sm leading-relaxed text-muted">
-                    {isVendor
-                      ? 'Use the board in your browser now, or add it to your home screen so Orders is one tap away.'
-                      : 'You can order in your browser right now, or install KampeDrop so it sits on your home screen like a normal app.'}
+                      {isVendor
+                        ? 'Use the board in your browser now, or put it on your home screen so Orders is one tap when heat arrives.'
+                        : 'You can order in your browser right now, or install KampeDrop so it sits on your home screen like a normal app.'}
                   </p>
 
                   {isVendor ? (
@@ -408,7 +410,7 @@ export function AppGuideSheet({
                     <p className="font-semibold text-ink">Tip</p>
                     <p className="mt-1 leading-relaxed">
                       {isVendor
-                        ? 'Install while on /vendor. This creates a separate KD Vendor icon that opens the board — not the customer order app.'
+                        ? 'Install while on /vendor. You want the KD Vendor icon — steady station, not the customer hunger app.'
                         : 'Installing is free and takes under a minute. No App Store download needed.'}
                     </p>
                   </div>
@@ -417,7 +419,7 @@ export function AppGuideSheet({
                 <div className="space-y-4">
                   <p className="text-sm leading-relaxed text-muted">
                     {isVendor
-                      ? 'Follow these steps on your phone. When you’re done, open the icon — it should open your vendor board.'
+                      ? 'Follow these steps. When you’re done, open KD Vendor — the board should greet you, not the shop.'
                       : 'Follow these steps on your device. When you’re done, open the KampeDrop icon — it goes straight to ordering.'}
                   </p>
 
@@ -522,15 +524,15 @@ export function InAppInstallTip() {
 
   return (
     <>
-      <div className="mb-5 flex items-center justify-between gap-3 rounded-full border border-lagoon/15 bg-paper/70 px-3.5 py-2 backdrop-blur-sm">
-        <p className="min-w-0 truncate text-xs font-semibold text-ink-soft">
-          Want the home-screen icon?
+      <div className="mb-5 flex items-center justify-between gap-3 rounded-full border border-mango/20 bg-[#fff8f1]/90 px-3.5 py-2 backdrop-blur-sm">
+        <p className="min-w-0 truncate text-xs font-semibold text-mango-deep">
+          Keep hunger one tap away?
         </p>
         <div className="flex shrink-0 gap-1">
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="rounded-full bg-ink px-3 py-1.5 text-[11px] font-bold text-white"
+            className="rounded-full bg-mango px-3 py-1.5 text-[11px] font-bold text-white"
           >
             Install
           </button>
@@ -577,18 +579,18 @@ export function VendorInstallTip() {
 
   return (
     <>
-      <div className="mb-5 rounded-2xl border border-lagoon/20 bg-paper px-4 py-3.5 shadow-sm">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-lagoon">
-          On your phone
+      <div className="mb-5 rounded-2xl border border-ink/15 bg-paper/90 px-4 py-3.5 shadow-sm">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-dusk">
+          Station on your phone
         </p>
         <p className="mt-1.5 text-sm font-semibold leading-snug text-ink">
-          Add this vendor board to your home screen — one tap to Orders during service.
+          Put the board on your home screen — one tap to Orders when the kitchen is live.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="rounded-full bg-ink px-3.5 py-2 text-xs font-bold text-white"
+            className="rounded-full bg-ink px-3.5 py-2 text-xs font-bold text-dusk"
           >
             Show install steps
           </button>
@@ -602,7 +604,7 @@ export function VendorInstallTip() {
                 /* ignore */
               }
             }}
-            className="rounded-full bg-mist px-3.5 py-2 text-xs font-bold text-muted"
+            className="rounded-full bg-ink/6 px-3.5 py-2 text-xs font-bold text-muted"
           >
             Later
           </button>
@@ -632,7 +634,7 @@ export function VendorInstallButton({
   return (
     <>
       <button type="button" className={className} onClick={() => setOpen(true)}>
-        Install on your phone
+        Install board on phone
       </button>
       <AppGuideSheet
         open={open}

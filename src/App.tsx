@@ -47,6 +47,7 @@ import {
   AdminVendorsPage,
 } from './pages/admin/AdminCatalogPages'
 import { AdminWithdrawalsPage } from './pages/admin/AdminWithdrawalsPage'
+import { RiderPortalPage } from './pages/rider/RiderPortalPage'
 import { APP_BASE, appPath, isStandaloneDisplay } from './paths'
 
 function StandaloneGate({ children }: { children: ReactNode }) {
@@ -58,6 +59,7 @@ function StandaloneGate({ children }: { children: ReactNode }) {
 
   if (location.pathname.startsWith('/admin')) return children
   if (location.pathname.startsWith('/vendor')) return children
+  if (location.pathname.startsWith('/rider')) return children
 
   const marketing =
     location.pathname === '/' ||
@@ -130,6 +132,8 @@ function AppRoutes() {
         <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
         <Route path="/admin/vendors" element={<AdminVendorsPage />} />
         <Route path="/admin/vendors/:vendorId" element={<AdminVendorEditPage />} />
+
+        <Route path="/rider" element={<RiderPortalPage />} />
 
         <Route path="/browse" element={<Navigate to={APP_BASE} replace />} />
         <Route path="/vendors/:vendorId" element={<LegacyVendorRedirect />} />

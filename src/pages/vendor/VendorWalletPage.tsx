@@ -3,9 +3,11 @@ import { useVendor } from '../../context/VendorContext'
 import { formatNaira } from '../../data/vendors'
 import {
   getVendorWallet,
+  initiateWithdrawalPayout,
   requestVendorWithdrawal,
   type VendorWalletSnapshot,
 } from '../../lib/vendorsApi'
+import { VendorBankDetailsSection } from './VendorBankDetailsSection'
 
 function formatWhen(iso: string) {
   try {
@@ -24,6 +26,9 @@ function formatWhen(iso: string) {
 function statusTone(status: string) {
   if (status === 'paid') return 'bg-ok/15 text-ok'
   if (status === 'rejected') return 'bg-mango/15 text-mango-deep'
+  if (status === 'failed') return 'bg-mango/15 text-mango-deep'
+  if (status === 'needs_otp') return 'bg-mango/15 text-mango-deep'
+  if (status === 'processing') return 'bg-lagoon/15 text-lagoon'
   return 'bg-dusk/40 text-ink'
 }
 
@@ -59,9 +64,16 @@ export function VendorWalletPage() {
     void refresh()
   }, [refresh])
 
+  const hasBank = Boolean(wallet?.bank.hasRecipient)
+
   async function onRequest(e: FormEvent) {
     e.preventDefault()
     if (!accessToken || !wallet) return
+
+    if (!wallet.bank.hasRecipient) {
+      setFormError('Add verified bank details before requesting a withdrawal.')
+      return
+    }
 
     const naira = Math.floor(Number(amount.replace(/[^\d]/g, '')))
     setFormError(null)
@@ -80,15 +92,47 @@ export function VendorWalletPage() {
 
     setBusy(true)
     const result = await requestVendorWithdrawal(accessToken, naira)
-    setBusy(false)
 
     if (!result.ok) {
+      setBusy(false)
       setFormError(result.reason)
       return
     }
 
     setAmount('')
-    setFormOk(`Withdrawal of ${formatNaira(naira)} requested. We’ll pay out manually.`)
+
+    if (result.withdrawal.status === 'processing') {
+      const payout = await initiateWithdrawalPayout({
+        withdrawalId: result.withdrawal.id,
+        accessToken,
+      })
+      setBusy(false)
+
+      if (!payout.ok) {
+        setFormError(
+          `Withdrawal created, but payout failed: ${payout.reason}`,
+        )
+        await refresh()
+        return
+      }
+
+      if (payout.payout.needsOtp) {
+        setFormOk(
+          `Withdrawal of ${formatNaira(naira)} initiated — Paystack needs OTP. Ops will finish it in Paystack; you’ll see Paid when it clears.`,
+        )
+      } else {
+        setFormOk(
+          `Withdrawal of ${formatNaira(naira)} sent to your bank. It will show as Paid when Paystack confirms.`,
+        )
+      }
+      await refresh()
+      return
+    }
+
+    setBusy(false)
+    setFormOk(
+      `Withdrawal of ${formatNaira(naira)} requested — awaiting ops review.`,
+    )
     await refresh()
   }
 
@@ -106,8 +150,8 @@ export function VendorWalletPage() {
             Wallet
           </h1>
           <p className="mt-1.5 text-sm font-semibold leading-snug text-ink-soft">
-            Credits land when a passkey confirms handoff. Withdrawals are paid by
-            KampeDrop ops.
+            Credits land when a passkey confirms handoff. Withdrawals pay to your
+            verified bank account.
           </p>
         </div>
         <button
@@ -126,7 +170,7 @@ export function VendorWalletPage() {
         </p>
       )}
 
-      {wallet && (
+      {wallet && accessToken && (
         <>
           <div className="mt-6 rounded-[1.5rem] border border-ink/10 bg-paper/90 px-5 py-5 shadow-sm">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted">
@@ -155,43 +199,60 @@ export function VendorWalletPage() {
             </div>
           </div>
 
-          <form
-            onSubmit={onRequest}
-            className="mt-5 rounded-[1.25rem] border border-ink/10 bg-paper/80 px-4 py-4"
-          >
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-dusk">
-              Request withdrawal
-            </p>
-            <p className="mt-1.5 text-xs font-semibold text-muted">
-              We’ll transfer to your registered payout details, then mark it paid.
-            </p>
-            <label className="mt-3 block">
-              <span className="text-xs font-bold uppercase tracking-wide text-muted">
-                Amount (₦)
-              </span>
-              <input
-                className="field mt-1.5"
-                inputMode="numeric"
-                placeholder="e.g. 15000"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))}
-                disabled={busy}
-              />
-            </label>
-            {formError && (
-              <p className="mt-2 text-sm font-semibold text-mango-deep">{formError}</p>
-            )}
-            {formOk && (
-              <p className="mt-2 text-sm font-semibold text-ok">{formOk}</p>
-            )}
-            <button
-              type="submit"
-              className="btn-ink mt-3 w-full disabled:opacity-60"
-              disabled={busy || wallet.availableToWithdraw <= 0}
+          <VendorBankDetailsSection
+            accessToken={accessToken}
+            bank={wallet.bank}
+            onSaved={refresh}
+          />
+
+          {hasBank ? (
+            <form
+              onSubmit={onRequest}
+              className="mt-5 rounded-[1.25rem] border border-ink/10 bg-paper/80 px-4 py-4"
             >
-              {busy ? 'Requesting…' : 'Request withdrawal'}
-            </button>
-          </form>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-dusk">
+                Request withdrawal
+              </p>
+              <p className="mt-1.5 text-xs font-semibold text-muted">
+                Pays to {wallet.bank.accountName ?? 'your verified account'} at{' '}
+                {wallet.bank.bankName ?? 'your bank'}.
+              </p>
+              <label className="mt-3 block">
+                <span className="text-xs font-bold uppercase tracking-wide text-muted">
+                  Amount (₦)
+                </span>
+                <input
+                  className="field mt-1.5"
+                  inputMode="numeric"
+                  placeholder="e.g. 15000"
+                  value={amount}
+                  onChange={(e) =>
+                    setAmount(e.target.value.replace(/[^\d]/g, ''))
+                  }
+                  disabled={busy}
+                />
+              </label>
+              {formError && (
+                <p className="mt-2 text-sm font-semibold text-mango-deep">
+                  {formError}
+                </p>
+              )}
+              {formOk && (
+                <p className="mt-2 text-sm font-semibold text-ok">{formOk}</p>
+              )}
+              <button
+                type="submit"
+                className="btn-ink mt-3 w-full disabled:opacity-60"
+                disabled={busy || wallet.availableToWithdraw <= 0}
+              >
+                {busy ? 'Requesting…' : 'Request withdrawal'}
+              </button>
+            </form>
+          ) : (
+            <p className="mt-5 rounded-xl border border-dashed border-ink/15 px-4 py-4 text-center text-sm font-semibold text-muted">
+              Add bank details above to unlock withdrawals.
+            </p>
+          )}
 
           <section className="mt-8">
             <h2 className="font-display text-lg font-bold tracking-[-0.02em]">
@@ -202,7 +263,8 @@ export function VendorWalletPage() {
             </p>
             {!credits.length ? (
               <p className="mt-4 rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-sm text-muted">
-                No credits yet. They appear when a buyer’s passkey confirms delivery.
+                No credits yet. They appear when a buyer’s passkey confirms
+                delivery.
               </p>
             ) : (
               <ul className="mt-3 space-y-2">
@@ -262,10 +324,14 @@ export function VendorWalletPage() {
                       </div>
                       <p className="mt-0.5 text-[11px] font-semibold text-muted">
                         Requested {formatWhen(w.requestedAt)}
-                        {w.resolvedAt ? ` · Resolved ${formatWhen(w.resolvedAt)}` : ''}
+                        {w.resolvedAt
+                          ? ` · Resolved ${formatWhen(w.resolvedAt)}`
+                          : ''}
                       </p>
                       {w.note && (
-                        <p className="mt-1 truncate text-[11px] text-ink-soft">{w.note}</p>
+                        <p className="mt-1 truncate text-[11px] text-ink-soft">
+                          {w.note}
+                        </p>
                       )}
                     </div>
                   </li>

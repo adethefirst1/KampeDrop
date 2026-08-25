@@ -1,4 +1,5 @@
 # KampeDrop Supabase config (minimal — Edge Functions + linked remote project)
+# verify_jwt = false: auth is app-level (vendor token / ops JWT check / Paystack HMAC)
 
 [functions.paystack-initialize]
 verify_jwt = false
@@ -7,4 +8,13 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.paystack-verify]
+verify_jwt = false
+
+[functions.vendor-resolve-account]
+verify_jwt = false
+
+[functions.vendor-save-bank]
+verify_jwt = false
+
+[functions.paystack-payout]
 verify_jwt = false

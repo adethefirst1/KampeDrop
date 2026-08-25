@@ -1,26 +1,24 @@
+/**
+ * Paystack webhook — charge (orders) + transfer (vendor withdrawals).
+ *
+ * Transfer events (after paystack-payout):
+ *   transfer.success  → RPC finalize_withdrawal_paid
+ *   transfer.failed   → RPC fail_withdrawal_payout (restore balance)
+ *   transfer.reversed → same as failed
+ *
+ * Charge events unchanged (card / VA for orders).
+ *
+ * Depends on RPCs (next piece):
+ *   finalize_withdrawal_paid(p_withdrawal_id, p_paystack_status)
+ *   fail_withdrawal_payout(p_withdrawal_id, p_note, p_paystack_status)
+ */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders, jsonResponse, textResponse } from '../_shared/cors.ts'
-
-const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY') ?? ''
-
-async function hmacSha512Hex(secret: string, payload: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-512' },
-    false,
-    ['sign'],
-  )
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload))
-  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  let out = 0
-  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return out === 0
-}
+import {
+  PAYSTACK_SECRET,
+  hmacSha512Hex,
+  timingSafeEqual,
+} from '../_shared/paystack.ts'
 
 function isPaidState(state: string | null | undefined): boolean {
   return (
@@ -28,6 +26,24 @@ function isPaidState(state: string | null | undefined): boolean {
     state === 'transfer_confirmed' ||
     state === 'released'
   )
+}
+
+type TransferData = {
+  reference?: string
+  transfer_code?: string
+  status?: string
+  amount?: number
+  currency?: string
+  reason?: string
+}
+
+type ChargeData = {
+  reference?: string
+  status?: string
+  amount?: number
+  currency?: string
+  channel?: string
+  metadata?: { order_id?: string; payment_method?: string }
 }
 
 Deno.serve(async (req) => {
@@ -53,17 +69,7 @@ Deno.serve(async (req) => {
     return textResponse('Invalid signature', 401)
   }
 
-  let event: {
-    event?: string
-    data?: {
-      reference?: string
-      status?: string
-      amount?: number
-      currency?: string
-      channel?: string
-      metadata?: { order_id?: string; payment_method?: string }
-    }
-  }
+  let event: { event?: string; data?: ChargeData & TransferData }
   try {
     event = JSON.parse(rawBody)
   } catch {
@@ -82,10 +88,117 @@ Deno.serve(async (req) => {
 
   const eventName = event.event ?? ''
   const data = event.data
+
+  // ---------------------------------------------------------------------------
+  // Transfer lifecycle (vendor withdrawals)
+  // ---------------------------------------------------------------------------
+  if (
+    eventName === 'transfer.success' ||
+    eventName === 'transfer.failed' ||
+    eventName === 'transfer.reversed'
+  ) {
+    const transferCode = data?.transfer_code?.trim()
+    const reference = data?.reference?.trim()
+    const paystackStatus = (data?.status ?? eventName.replace('transfer.', '')).trim()
+
+    if (!transferCode && !reference) {
+      return jsonResponse({ received: true, ignored: 'missing transfer ids' })
+    }
+
+    let q = admin
+      .from('wallet_withdrawals')
+      .select('id, amount, status, paystack_transfer_code, paystack_reference')
+
+    if (transferCode) {
+      q = q.eq('paystack_transfer_code', transferCode)
+    } else {
+      q = q.eq('paystack_reference', reference!)
+    }
+
+    const { data: withdrawal, error: loadErr } = await q.maybeSingle()
+    if (loadErr) {
+      console.error('webhook load withdrawal', loadErr)
+      return textResponse('DB error', 500)
+    }
+    if (!withdrawal) {
+      console.error('webhook: withdrawal not found', { transferCode, reference })
+      return jsonResponse({ received: true, ignored: 'withdrawal not found' })
+    }
+
+    // Optional amount check (Paystack sends kobo)
+    if (typeof data?.amount === 'number') {
+      const expectedKobo = Math.round(Number(withdrawal.amount) * 100)
+      if (data.amount !== expectedKobo) {
+        console.error('Transfer amount mismatch', {
+          withdrawal: withdrawal.id,
+          expectedKobo,
+          got: data.amount,
+        })
+        // Still process — log loudly; do not ignore (ops needs the status)
+      }
+    }
+
+    if (eventName === 'transfer.success') {
+      if (withdrawal.status === 'paid') {
+        return jsonResponse({ received: true, already: 'paid', id: withdrawal.id })
+      }
+
+      const { error: rpcErr } = await admin.rpc('finalize_withdrawal_paid', {
+        p_withdrawal_id: withdrawal.id,
+        p_paystack_status: paystackStatus || 'success',
+      })
+
+      if (rpcErr) {
+        console.error('finalize_withdrawal_paid', rpcErr)
+        return textResponse('Finalize failed', 500)
+      }
+
+      return jsonResponse({
+        received: true,
+        withdrawal_id: withdrawal.id,
+        status: 'paid',
+      })
+    }
+
+    // failed | reversed → restore balance if we had debited
+    if (withdrawal.status === 'failed') {
+      return jsonResponse({ received: true, already: 'failed', id: withdrawal.id })
+    }
+    if (withdrawal.status === 'paid') {
+      // Rare: success then reverse — still run fail path (idempotent restore)
+      console.warn('transfer reverse/fail after paid', withdrawal.id, eventName)
+    }
+
+    const note =
+      eventName === 'transfer.reversed'
+        ? 'Paystack reversed this transfer — balance restored.'
+        : 'Paystack reported transfer failed — balance restored.'
+
+    const { error: failErr } = await admin.rpc('fail_withdrawal_payout', {
+      p_withdrawal_id: withdrawal.id,
+      p_note: note,
+      p_paystack_status: paystackStatus || eventName.replace('transfer.', ''),
+    })
+
+    if (failErr) {
+      console.error('fail_withdrawal_payout', failErr)
+      return textResponse('Fail/restore failed', 500)
+    }
+
+    return jsonResponse({
+      received: true,
+      withdrawal_id: withdrawal.id,
+      status: 'failed',
+      event: eventName,
+    })
+  }
+
+  // ---------------------------------------------------------------------------
+  // Charge lifecycle (orders) — unchanged
+  // ---------------------------------------------------------------------------
   const reference = data?.reference?.trim()
   const orderIdFromMeta = data?.metadata?.order_id?.trim()
 
-  // Resolve order: prefer metadata.order_id, else strip retry suffix from reference
   let orderId = orderIdFromMeta
   if (!orderId && reference) {
     const maybe = reference.includes('-')
@@ -137,9 +250,6 @@ Deno.serve(async (req) => {
       return jsonResponse({ received: true, ignored: 'amount mismatch' }, 200)
     }
 
-    // Keep field naming by payment method:
-    //   card     → card_paid
-    //   transfer → transfer_confirmed (Paystack VA paid; escrow still held)
     const nextState =
       order.payment === 'transfer' ? 'transfer_confirmed' : 'card_paid'
 
@@ -184,7 +294,6 @@ Deno.serve(async (req) => {
       return jsonResponse({ received: true, already: 'paid' })
     }
 
-    // Card gets an explicit failed state; transfer stays pending so buyer can retry VA
     if (order.payment === 'card') {
       await admin
         .from('orders')

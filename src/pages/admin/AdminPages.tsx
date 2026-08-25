@@ -15,6 +15,7 @@ import {
 import { formatNaira } from '../../data/vendors'
 import { easeOut, springSoft, tapPress } from '../../motion/tokens'
 import { RequireOps } from './AdminShell'
+import { AvailableRidersPanel } from './AvailableRidersPanel'
 
 type Filter =
   | 'all'
@@ -176,6 +177,10 @@ export function AdminInboxPage() {
         <Stat label="Active" value={counts.active} />
         <Stat label="Done" value={counts.done} />
         <Stat label="Problem" value={counts.problems} hot={counts.problems > 0} />
+      </div>
+
+      <div className="mt-5">
+        <AvailableRidersPanel />
       </div>
 
       {ordersError && (

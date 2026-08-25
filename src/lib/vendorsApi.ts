@@ -687,11 +687,41 @@ export type WalletWithdrawal = {
   resolvedAt: string | null
 }
 
+export type VendorBankDetails = {
+  bankName: string | null
+  bankCode: string | null
+  accountNumber: string | null
+  accountName: string | null
+  hasRecipient: boolean
+}
+
+export type PaystackBankOption = {
+  name: string
+  code: string
+}
+
+/**
+ * Paystack synthetic test bank (not returned by List Banks).
+ * Injected only when `import.meta.env.DEV` — never in production Vite builds
+ * (Vercel live / any `vite build`), so real vendors never see it.
+ */
+export const PAYSTACK_DEV_TEST_BANK: PaystackBankOption = {
+  name: 'Test Bank (001) — test only',
+  code: '001',
+}
+
+function withDevTestBank(banks: PaystackBankOption[]): PaystackBankOption[] {
+  if (!import.meta.env.DEV) return banks
+  if (banks.some((b) => b.code === PAYSTACK_DEV_TEST_BANK.code)) return banks
+  return [PAYSTACK_DEV_TEST_BANK, ...banks]
+}
+
 export type VendorWalletSnapshot = {
   vendorId: string
   walletBalance: number
   pendingWithdrawalTotal: number
   availableToWithdraw: number
+  bank: VendorBankDetails
   transactions: WalletTransaction[]
   withdrawals: WalletWithdrawal[]
 }
@@ -724,6 +754,19 @@ function mapOpsWithdrawalRow(row: Record<string, unknown>): OpsWithdrawalRequest
   }
 }
 
+function parseBankDetails(raw: unknown): VendorBankDetails {
+  const bank =
+    raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  return {
+    bankName: bank.bank_name != null ? String(bank.bank_name) : null,
+    bankCode: bank.bank_code != null ? String(bank.bank_code) : null,
+    accountNumber:
+      bank.account_number != null ? String(bank.account_number) : null,
+    accountName: bank.account_name != null ? String(bank.account_name) : null,
+    hasRecipient: Boolean(bank.has_recipient),
+  }
+}
+
 function parseWalletSnapshot(raw: Record<string, unknown>): VendorWalletSnapshot {
   const txs = Array.isArray(raw.transactions) ? raw.transactions : []
   const withdrawals = Array.isArray(raw.withdrawals) ? raw.withdrawals : []
@@ -732,6 +775,7 @@ function parseWalletSnapshot(raw: Record<string, unknown>): VendorWalletSnapshot
     walletBalance: Number(raw.wallet_balance ?? 0),
     pendingWithdrawalTotal: Number(raw.pending_withdrawal_total ?? 0),
     availableToWithdraw: Number(raw.available_to_withdraw ?? 0),
+    bank: parseBankDetails(raw.bank),
     transactions: txs.map((t) => {
       const row = t as Record<string, unknown>
       return {
@@ -755,6 +799,266 @@ function parseWalletSnapshot(raw: Record<string, unknown>): VendorWalletSnapshot
         resolvedAt: row.resolved_at != null ? String(row.resolved_at) : null,
       }
     }),
+  }
+}
+
+function vendorFunctionsBase(): string {
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
+  return url?.replace(/\/$/, '') + '/functions/v1'
+}
+
+function vendorAnonHeaders(): HeadersInit {
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${anonKey}`,
+    apikey: anonKey,
+  }
+}
+
+async function postVendorBankFunction(
+  path: string,
+  body: Record<string, unknown>,
+): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+
+  const res = await fetch(`${vendorFunctionsBase()}/${path}`, {
+    method: 'POST',
+    headers: vendorAnonHeaders(),
+    body: JSON.stringify(body),
+  })
+
+  const json = (await res.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null
+
+  if (!res.ok) {
+    const msg =
+      (json?.error != null ? String(json.error) : '') ||
+      (json?.message != null ? String(json.message) : '') ||
+      `Request failed (${res.status}).`
+    return { ok: false, reason: msg }
+  }
+
+  if (!json) {
+    return { ok: false, reason: 'Empty response from bank service.' }
+  }
+
+  return { ok: true, json }
+}
+
+/** Paystack NGN bank list via vendor-resolve-account (action: list_banks). */
+export async function listVendorPayoutBanks(
+  accessToken: string,
+): Promise<
+  { ok: true; banks: PaystackBankOption[] } | { ok: false; reason: string }
+> {
+  const result = await postVendorBankFunction('vendor-resolve-account', {
+    token: accessToken,
+    action: 'list_banks',
+  })
+
+  // Local dev: always offer Paystack's synthetic test bank (code 001), even if
+  // List Banks fails — production builds never take this path.
+  if (!result.ok) {
+    if (import.meta.env.DEV) {
+      return { ok: true, banks: [PAYSTACK_DEV_TEST_BANK] }
+    }
+    return result
+  }
+
+  const rows = Array.isArray(result.json.banks) ? result.json.banks : []
+  const banks = rows
+    .map((b) => {
+      const row = b as Record<string, unknown>
+      return {
+        name: String(row.name ?? ''),
+        code: String(row.code ?? ''),
+      }
+    })
+    .filter((b) => b.name && b.code)
+
+  if (!banks.length) {
+    if (import.meta.env.DEV) {
+      return { ok: true, banks: [PAYSTACK_DEV_TEST_BANK] }
+    }
+    return { ok: false, reason: 'No banks returned from Paystack. Try again.' }
+  }
+
+  return { ok: true, banks: withDevTestBank(banks) }
+}
+
+/** Resolve NUBAN → Paystack account holder name (does not save). */
+export async function resolveVendorBankAccount(
+  accessToken: string,
+  input: { bankCode: string; accountNumber: string },
+): Promise<
+  | {
+      ok: true
+      accountNumber: string
+      accountName: string
+      bankCode: string
+    }
+  | { ok: false; reason: string }
+> {
+  const accountNumber = input.accountNumber.replace(/\s+/g, '')
+  if (!/^\d{10}$/.test(accountNumber)) {
+    return { ok: false, reason: 'Account number must be exactly 10 digits.' }
+  }
+  if (!input.bankCode.trim()) {
+    return { ok: false, reason: 'Select a bank first.' }
+  }
+
+  const result = await postVendorBankFunction('vendor-resolve-account', {
+    token: accessToken,
+    action: 'resolve',
+    bank_code: input.bankCode.trim(),
+    account_number: accountNumber,
+  })
+  if (!result.ok) return result
+
+  const accountName = String(result.json.account_name ?? '').trim()
+  if (!accountName) {
+    return {
+      ok: false,
+      reason: 'Paystack did not return an account name for this number.',
+    }
+  }
+
+  return {
+    ok: true,
+    accountNumber: String(result.json.account_number ?? accountNumber),
+    accountName,
+    bankCode: String(result.json.bank_code ?? input.bankCode),
+  }
+}
+
+/** Confirm resolved name → create recipient + save on vendors row. */
+export async function saveVendorBankDetails(
+  accessToken: string,
+  input: {
+    bankCode: string
+    bankName: string
+    accountNumber: string
+    accountName: string
+  },
+): Promise<
+  { ok: true; bank: VendorBankDetails } | { ok: false; reason: string }
+> {
+  const result = await postVendorBankFunction('vendor-save-bank', {
+    token: accessToken,
+    bank_code: input.bankCode.trim(),
+    bank_name: input.bankName.trim(),
+    account_number: input.accountNumber.replace(/\s+/g, ''),
+    account_name: input.accountName.trim(),
+  })
+  if (!result.ok) return result
+
+  return {
+    ok: true,
+    bank: {
+      bankName: String(result.json.bank_name ?? input.bankName),
+      bankCode: String(result.json.bank_code ?? input.bankCode),
+      accountNumber: String(result.json.account_number ?? input.accountNumber),
+      accountName: String(result.json.account_name ?? input.accountName),
+      hasRecipient: Boolean(result.json.paystack_recipient_code),
+    },
+  }
+}
+
+/** Mask NUBAN for display: ******1234 */
+export function maskAccountNumber(accountNumber: string | null | undefined): string {
+  const digits = String(accountNumber ?? '').replace(/\D/g, '')
+  if (digits.length < 4) return '••••'
+  return `${'•'.repeat(Math.max(6, digits.length - 4))}${digits.slice(-4)}`
+}
+
+export type PayoutInitiateResult = {
+  withdrawalId: string
+  status: string
+  transferCode: string | null
+  reference: string | null
+  needsOtp: boolean
+  message: string | null
+}
+
+/**
+ * Call paystack-payout Edge Function.
+ * Vendor auto-path: pass accessToken.
+ * Ops Approve: omit token (uses signed-in ops JWT via is_ops).
+ */
+export async function initiateWithdrawalPayout(input: {
+  withdrawalId: string
+  /** Vendor portal access_token — required for vendor-triggered auto payout */
+  accessToken?: string
+}): Promise<
+  { ok: true; payout: PayoutInitiateResult } | { ok: false; reason: string }
+> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+  const body: Record<string, unknown> = {
+    withdrawal_id: input.withdrawalId,
+  }
+
+  let authorization = `Bearer ${anonKey}`
+
+  if (input.accessToken?.trim()) {
+    body.token = input.accessToken.trim()
+  } else {
+    const supabase = getSupabase()
+    if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession()
+    if (sessionError || !sessionData.session?.access_token) {
+      return { ok: false, reason: 'Ops session expired. Sign in again.' }
+    }
+    authorization = `Bearer ${sessionData.session.access_token}`
+  }
+
+  const res = await fetch(`${vendorFunctionsBase()}/paystack-payout`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: authorization,
+      apikey: anonKey,
+    },
+    body: JSON.stringify(body),
+  })
+
+  const json = (await res.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null
+
+  if (!res.ok) {
+    const msg =
+      (json?.error != null ? String(json.error) : '') ||
+      (json?.message != null ? String(json.message) : '') ||
+      `Payout failed (${res.status}).`
+    return { ok: false, reason: msg }
+  }
+
+  if (!json) {
+    return { ok: false, reason: 'Empty response from payout service.' }
+  }
+
+  return {
+    ok: true,
+    payout: {
+      withdrawalId: String(json.withdrawal_id ?? input.withdrawalId),
+      status: String(json.status ?? ''),
+      transferCode:
+        json.transfer_code != null ? String(json.transfer_code) : null,
+      reference: json.reference != null ? String(json.reference) : null,
+      needsOtp: Boolean(json.needs_otp),
+      message: json.message != null ? String(json.message) : null,
+    },
   }
 }
 
@@ -822,7 +1126,7 @@ export async function requestVendorWithdrawal(
   }
 }
 
-/** Ops: pending withdrawal requests across all vendors (RLS is_ops). */
+/** Ops: pending + in-flight (processing / needs_otp) across all vendors. */
 export async function fetchOpsPendingWithdrawals(): Promise<
   { ok: true; requests: OpsWithdrawalRequest[] } | { ok: false; reason: string }
 > {
@@ -837,7 +1141,7 @@ export async function fetchOpsPendingWithdrawals(): Promise<
     .select(
       'id, vendor_id, amount, status, note, requested_at, resolved_at, vendors(name)',
     )
-    .eq('status', 'pending')
+    .in('status', ['pending', 'processing', 'needs_otp'])
     .order('requested_at', { ascending: true })
 
   if (error) return { ok: false, reason: error.message }
@@ -850,7 +1154,7 @@ export async function fetchOpsPendingWithdrawals(): Promise<
   }
 }
 
-/** Ops: paid + rejected withdrawals, newest resolved first. */
+/** Ops: paid + rejected + failed, newest resolved first. */
 export async function fetchOpsResolvedWithdrawals(): Promise<
   { ok: true; requests: OpsWithdrawalRequest[] } | { ok: false; reason: string }
 > {
@@ -865,7 +1169,7 @@ export async function fetchOpsResolvedWithdrawals(): Promise<
     .select(
       'id, vendor_id, amount, status, note, requested_at, resolved_at, vendors(name)',
     )
-    .in('status', ['paid', 'rejected'])
+    .in('status', ['paid', 'rejected', 'failed'])
     .order('resolved_at', { ascending: false })
     .limit(100)
 
@@ -879,7 +1183,7 @@ export async function fetchOpsResolvedWithdrawals(): Promise<
   }
 }
 
-/** Ops: mark bank transfer sent — reduces wallet_balance. */
+/** Ops: mark paid manually (emergency override — not the normal Approve path). */
 export async function markWithdrawalPaid(
   withdrawalId: string,
   note?: string | null,

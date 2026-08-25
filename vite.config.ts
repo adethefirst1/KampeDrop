@@ -32,12 +32,22 @@ function stripToVendorManifest(html: string) {
 
 /** Serve vendor.html for /vendor*; index.html for other client routes (MPA fallback). */
 function htmlShellRewrites(): Plugin {
-  function rewrite(req: { url?: string; headers: { accept?: string } }) {
+  function rewrite(req: {
+    url?: string
+    method?: string
+    headers: { accept?: string; 'sec-fetch-dest'?: string }
+  }) {
+    if (req.method && req.method !== 'GET' && req.method !== 'HEAD') return
+
     const raw = req.url ?? ''
-    const q = raw.includes('?') ? raw.slice(raw.indexOf('?')) : ''
     const pathOnly = raw.split('?')[0] ?? ''
-    const wantsHtml = (req.headers.accept ?? '').includes('text/html')
-    if (!wantsHtml) return
+    const accept = req.headers.accept ?? ''
+    // Only real page navigations — never */* (module requests use that and would
+    // pipe index.html through vite:import-analysis as JS).
+    const isDocumentNav =
+      req.headers['sec-fetch-dest'] === 'document' ||
+      accept.includes('text/html')
+    if (!isDocumentNav) return
     // Leave real assets alone (js/css/png/webmanifest/etc.)
     if (/\.\w+$/.test(pathOnly)) return
 
@@ -45,18 +55,19 @@ function htmlShellRewrites(): Plugin {
       pathOnly.startsWith('/vendor') &&
       !pathOnly.startsWith('/vendor.html')
     ) {
-      req.url = `/vendor.html${q}`
+      // Drop query on the rewritten path — browser URL keeps ?token=… for the client.
+      req.url = '/vendor.html'
       return
     }
 
-    // MPA mode has no SPA history fallback — map app/admin/marketing deep links
-    // to the customer shell so React Router can handle them.
+    // MPA mode has no SPA history fallback — map app/admin/rider/marketing
+    // deep links to the customer shell so React Router can handle them.
     if (
       pathOnly !== '/' &&
       pathOnly !== '/index.html' &&
       !pathOnly.startsWith('/vendor')
     ) {
-      req.url = `/index.html${q}`
+      req.url = '/index.html'
     }
   }
 

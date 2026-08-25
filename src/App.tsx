@@ -36,6 +36,7 @@ import { VendorHistoryPage } from './pages/vendor/VendorHistoryPage'
 import { VendorOrderDetailPage } from './pages/vendor/VendorOrderDetailPage'
 import { VendorMenuPage } from './pages/vendor/VendorMenuPage'
 import { VendorProfilePage } from './pages/vendor/VendorProfilePage'
+import { VendorWalletPage } from './pages/vendor/VendorWalletPage'
 import {
   AdminInboxPage,
   AdminLoginPage,
@@ -45,6 +46,7 @@ import {
   AdminVendorEditPage,
   AdminVendorsPage,
 } from './pages/admin/AdminCatalogPages'
+import { AdminWithdrawalsPage } from './pages/admin/AdminWithdrawalsPage'
 import { APP_BASE, appPath, isStandaloneDisplay } from './paths'
 
 function StandaloneGate({ children }: { children: ReactNode }) {
@@ -104,6 +106,7 @@ function AppRoutes() {
         >
           <Route index element={<VendorOrdersPage />} />
           <Route path="history" element={<VendorHistoryPage />} />
+          <Route path="wallet" element={<VendorWalletPage />} />
           <Route path="orders/:orderId" element={<VendorOrderDetailPage />} />
           <Route path="menu" element={<VendorMenuPage />} />
           <Route path="profile" element={<VendorProfilePage />} />
@@ -124,6 +127,7 @@ function AppRoutes() {
         <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/admin" element={<AdminInboxPage />} />
         <Route path="/admin/orders/:orderId" element={<AdminOrderPage />} />
+        <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
         <Route path="/admin/vendors" element={<AdminVendorsPage />} />
         <Route path="/admin/vendors/:vendorId" element={<AdminVendorEditPage />} />
 

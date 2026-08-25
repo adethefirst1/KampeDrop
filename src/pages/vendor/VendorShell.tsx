@@ -44,6 +44,7 @@ export function VendorShell() {
   const tabs = [
     { to: vendorPath(), label: 'Orders', end: true },
     { to: vendorPath('/history'), label: 'History', end: false },
+    { to: vendorPath('/wallet'), label: 'Wallet', end: false },
     { to: vendorPath('/menu'), label: 'Menu', end: false },
     { to: vendorPath('/profile'), label: 'Business', end: false },
   ]
@@ -83,7 +84,10 @@ export function VendorShell() {
             </button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-lg gap-1 px-4 pb-2.5" aria-label="Vendor board">
+        <nav
+          className="mx-auto flex max-w-lg gap-1 overflow-x-auto px-4 pb-2.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-label="Vendor board"
+        >
           {tabs.map((tab) => {
             const active = tab.end
               ? pathname === tab.to
@@ -95,7 +99,7 @@ export function VendorShell() {
                 key={tab.to}
                 to={tab.to}
                 end={tab.end}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-extrabold transition ${
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-extrabold transition ${
                   active
                     ? 'bg-ink text-dusk shadow-[0_2px_0_rgba(6,24,28,0.35)]'
                     : 'bg-ink/6 text-ink-soft hover:bg-ink/10'

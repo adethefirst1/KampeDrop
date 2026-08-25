@@ -30,23 +30,47 @@ function stripToVendorManifest(html: string) {
   return out
 }
 
-/** Serve vendor.html for /vendor* and force vendor-only manifest on that shell. */
-function vendorHtmlShell(): Plugin {
+/** Serve vendor.html for /vendor*; index.html for other client routes (MPA fallback). */
+function htmlShellRewrites(): Plugin {
+  function rewrite(req: { url?: string; headers: { accept?: string } }) {
+    const raw = req.url ?? ''
+    const q = raw.includes('?') ? raw.slice(raw.indexOf('?')) : ''
+    const pathOnly = raw.split('?')[0] ?? ''
+    const wantsHtml = (req.headers.accept ?? '').includes('text/html')
+    if (!wantsHtml) return
+    // Leave real assets alone (js/css/png/webmanifest/etc.)
+    if (/\.\w+$/.test(pathOnly)) return
+
+    if (
+      pathOnly.startsWith('/vendor') &&
+      !pathOnly.startsWith('/vendor.html')
+    ) {
+      req.url = `/vendor.html${q}`
+      return
+    }
+
+    // MPA mode has no SPA history fallback — map app/admin/marketing deep links
+    // to the customer shell so React Router can handle them.
+    if (
+      pathOnly !== '/' &&
+      pathOnly !== '/index.html' &&
+      !pathOnly.startsWith('/vendor')
+    ) {
+      req.url = `/index.html${q}`
+    }
+  }
+
   return {
-    name: 'kampedrop-vendor-html-shell',
+    name: 'kampedrop-html-shell-rewrites',
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
-        const raw = req.url ?? ''
-        const pathOnly = raw.split('?')[0] ?? ''
-        const wantsHtml = (req.headers.accept ?? '').includes('text/html')
-        if (
-          wantsHtml &&
-          pathOnly.startsWith('/vendor') &&
-          !pathOnly.startsWith('/vendor.html') &&
-          !/\.\w+$/.test(pathOnly)
-        ) {
-          req.url = `/vendor.html${raw.includes('?') ? raw.slice(raw.indexOf('?')) : ''}`
-        }
+        rewrite(req)
+        next()
+      })
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        rewrite(req)
         next()
       })
     },
@@ -62,7 +86,6 @@ function vendorHtmlShell(): Plugin {
       patchVendorHtmlDist()
     },
     closeBundle() {
-      // After vite-plugin-pwa finishes generating the SW / touching HTML.
       patchVendorHtmlDist()
     },
   }
@@ -142,7 +165,7 @@ export default defineConfig({
       },
     }),
     // Must run after VitePWA so we can strip the customer manifest it injects.
-    vendorHtmlShell(),
+    htmlShellRewrites(),
   ],
   build: {
     rollupOptions: {

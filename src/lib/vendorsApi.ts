@@ -665,3 +665,256 @@ export async function listVendorApplicationPhotoUrls(
           .publicUrl,
     )
 }
+
+/* ─── Vendor wallet ─────────────────────────────────────────────────────── */
+
+export type WalletTransaction = {
+  id: string
+  orderId: string | null
+  withdrawalId: string | null
+  amount: number
+  type: 'order_credit' | 'withdrawal_paid' | string
+  note: string | null
+  createdAt: string
+}
+
+export type WalletWithdrawal = {
+  id: string
+  amount: number
+  status: 'pending' | 'paid' | 'rejected' | string
+  note: string | null
+  requestedAt: string
+  resolvedAt: string | null
+}
+
+export type VendorWalletSnapshot = {
+  vendorId: string
+  walletBalance: number
+  pendingWithdrawalTotal: number
+  availableToWithdraw: number
+  transactions: WalletTransaction[]
+  withdrawals: WalletWithdrawal[]
+}
+
+export type OpsWithdrawalRequest = {
+  id: string
+  vendorId: string
+  vendorName: string
+  amount: number
+  status: string
+  note: string | null
+  requestedAt: string
+  resolvedAt: string | null
+}
+
+function mapOpsWithdrawalRow(row: Record<string, unknown>): OpsWithdrawalRequest {
+  const vendorJoin = row.vendors as { name?: string } | { name?: string }[] | null
+  const vendorName = Array.isArray(vendorJoin)
+    ? String(vendorJoin[0]?.name ?? 'Vendor')
+    : String(vendorJoin?.name ?? 'Vendor')
+  return {
+    id: String(row.id ?? ''),
+    vendorId: String(row.vendor_id ?? ''),
+    vendorName,
+    amount: Number(row.amount ?? 0),
+    status: String(row.status ?? 'pending'),
+    note: row.note != null ? String(row.note) : null,
+    requestedAt: String(row.requested_at ?? ''),
+    resolvedAt: row.resolved_at != null ? String(row.resolved_at) : null,
+  }
+}
+
+function parseWalletSnapshot(raw: Record<string, unknown>): VendorWalletSnapshot {
+  const txs = Array.isArray(raw.transactions) ? raw.transactions : []
+  const withdrawals = Array.isArray(raw.withdrawals) ? raw.withdrawals : []
+  return {
+    vendorId: String(raw.vendor_id ?? ''),
+    walletBalance: Number(raw.wallet_balance ?? 0),
+    pendingWithdrawalTotal: Number(raw.pending_withdrawal_total ?? 0),
+    availableToWithdraw: Number(raw.available_to_withdraw ?? 0),
+    transactions: txs.map((t) => {
+      const row = t as Record<string, unknown>
+      return {
+        id: String(row.id ?? ''),
+        orderId: row.order_id != null ? String(row.order_id) : null,
+        withdrawalId: row.withdrawal_id != null ? String(row.withdrawal_id) : null,
+        amount: Number(row.amount ?? 0),
+        type: String(row.type ?? ''),
+        note: row.note != null ? String(row.note) : null,
+        createdAt: String(row.created_at ?? ''),
+      }
+    }),
+    withdrawals: withdrawals.map((w) => {
+      const row = w as Record<string, unknown>
+      return {
+        id: String(row.id ?? ''),
+        amount: Number(row.amount ?? 0),
+        status: String(row.status ?? ''),
+        note: row.note != null ? String(row.note) : null,
+        requestedAt: String(row.requested_at ?? ''),
+        resolvedAt: row.resolved_at != null ? String(row.resolved_at) : null,
+      }
+    }),
+  }
+}
+
+/** Vendor portal: balance, ledger, withdrawals. */
+export async function getVendorWallet(
+  accessToken: string,
+): Promise<{ ok: true; wallet: VendorWalletSnapshot } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase.rpc('get_vendor_wallet', {
+    p_token: accessToken,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+  if (!data || typeof data !== 'object') {
+    return { ok: false, reason: 'Empty wallet response.' }
+  }
+
+  return {
+    ok: true,
+    wallet: parseWalletSnapshot(data as Record<string, unknown>),
+  }
+}
+
+/** Vendor portal: create pending withdrawal (does not reduce balance yet). */
+export async function requestVendorWithdrawal(
+  accessToken: string,
+  amountNgn: number,
+): Promise<{ ok: true; withdrawal: WalletWithdrawal } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const amount = Math.floor(amountNgn)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, reason: 'Enter a positive amount in Naira.' }
+  }
+
+  const { data, error } = await supabase.rpc('request_withdrawal', {
+    p_token: accessToken,
+    p_amount: amount,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null
+  if (!row) return { ok: false, reason: 'No withdrawal returned.' }
+
+  return {
+    ok: true,
+    withdrawal: {
+      id: String(row.id ?? ''),
+      amount: Number(row.amount ?? 0),
+      status: String(row.status ?? 'pending'),
+      note: row.note != null ? String(row.note) : null,
+      requestedAt: String(row.requested_at ?? ''),
+      resolvedAt: row.resolved_at != null ? String(row.resolved_at) : null,
+    },
+  }
+}
+
+/** Ops: pending withdrawal requests across all vendors (RLS is_ops). */
+export async function fetchOpsPendingWithdrawals(): Promise<
+  { ok: true; requests: OpsWithdrawalRequest[] } | { ok: false; reason: string }
+> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase
+    .from('wallet_withdrawals')
+    .select(
+      'id, vendor_id, amount, status, note, requested_at, resolved_at, vendors(name)',
+    )
+    .eq('status', 'pending')
+    .order('requested_at', { ascending: true })
+
+  if (error) return { ok: false, reason: error.message }
+
+  return {
+    ok: true,
+    requests: (data ?? []).map((row) =>
+      mapOpsWithdrawalRow(row as Record<string, unknown>),
+    ),
+  }
+}
+
+/** Ops: paid + rejected withdrawals, newest resolved first. */
+export async function fetchOpsResolvedWithdrawals(): Promise<
+  { ok: true; requests: OpsWithdrawalRequest[] } | { ok: false; reason: string }
+> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase
+    .from('wallet_withdrawals')
+    .select(
+      'id, vendor_id, amount, status, note, requested_at, resolved_at, vendors(name)',
+    )
+    .in('status', ['paid', 'rejected'])
+    .order('resolved_at', { ascending: false })
+    .limit(100)
+
+  if (error) return { ok: false, reason: error.message }
+
+  return {
+    ok: true,
+    requests: (data ?? []).map((row) =>
+      mapOpsWithdrawalRow(row as Record<string, unknown>),
+    ),
+  }
+}
+
+/** Ops: mark bank transfer sent — reduces wallet_balance. */
+export async function markWithdrawalPaid(
+  withdrawalId: string,
+  note?: string | null,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { error } = await supabase.rpc('mark_withdrawal_paid', {
+    p_withdrawal_id: withdrawalId,
+    p_note: note?.trim() ? note.trim() : null,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+  return { ok: true }
+}
+
+/** Ops: reject a pending withdrawal (no balance change). */
+export async function rejectWithdrawal(
+  withdrawalId: string,
+  note?: string | null,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { error } = await supabase.rpc('reject_withdrawal', {
+    p_withdrawal_id: withdrawalId,
+    p_note: note?.trim() ? note.trim() : null,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+  return { ok: true }
+}

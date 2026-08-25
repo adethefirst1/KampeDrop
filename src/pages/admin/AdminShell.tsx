@@ -20,6 +20,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const onOrders = pathname === '/admin' || pathname.startsWith('/admin/orders')
   const onVendors = pathname.startsWith('/admin/vendors')
+  const onWithdrawals = pathname.startsWith('/admin/withdrawals')
 
   return (
     <div className="min-h-svh mist-wash text-ink">
@@ -36,6 +37,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
               }`}
             >
               Orders
+            </Link>
+            <Link
+              to="/admin/withdrawals"
+              className={`rounded-full px-3 py-1.5 ${
+                onWithdrawals ? 'bg-ink text-white' : 'text-muted hover:text-ink'
+              }`}
+            >
+              Payouts
             </Link>
             <Link
               to="/admin/vendors"

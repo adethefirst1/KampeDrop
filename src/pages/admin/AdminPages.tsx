@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { useCatalog } from '../../context/CatalogContext'
@@ -408,6 +408,8 @@ export function AdminOrderPage() {
   const [problem, setProblem] = useState('late')
   const [passInput, setPassInput] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
+  const [pendingRider, setPendingRider] = useState<OpsRider | null>(null)
+  const [changingRider, setChangingRider] = useState(false)
 
   const availableRiders = useMemo(
     () => riders.filter((r) => r.available),
@@ -417,6 +419,12 @@ export function AdminOrderPage() {
     () => riders.filter((r) => !r.available),
     [riders],
   )
+
+  // Reset assign UI when switching orders
+  useEffect(() => {
+    setPendingRider(null)
+    setChangingRider(false)
+  }, [orderId])
 
   if (!order) {
     return (
@@ -442,11 +450,38 @@ export function AdminOrderPage() {
   const rider = riders.find((r) => r.id === order.riderId) ?? null
   const cancelled = order.status === 'cancelled'
   const rank = statusRank(order.status, fulfillment)
-  const canAssign =
-    !cancelled && rank < statusRank('picked_up', fulfillment)
+  /** Assign / reassign only before physical pickup. */
+  const canEditRider =
+    !cancelled && !pickup && rank < statusRank('picked_up', fulfillment)
+  const hasRider = Boolean(order.riderId)
+  const showRiderPicker = canEditRider && (!hasRider || changingRider)
+  const orderIdSafe = order.id
+  const currentRiderId = order.riderId
 
   function run(result: { ok: true } | { ok: false; reason: string }) {
     setActionError(result.ok ? null : result.reason)
+  }
+
+  function requestAssign(next: OpsRider) {
+    if (!canEditRider) return
+    if (currentRiderId === next.id) {
+      setPendingRider(null)
+      setChangingRider(false)
+      return
+    }
+    setActionError(null)
+    setPendingRider(next)
+  }
+
+  function confirmAssign() {
+    if (!pendingRider || !canEditRider) return
+    assignRider(orderIdSafe, pendingRider.id)
+    setPendingRider(null)
+    setChangingRider(false)
+  }
+
+  function cancelPendingAssign() {
+    setPendingRider(null)
   }
 
   async function runAsync(
@@ -790,19 +825,87 @@ export function AdminOrderPage() {
             </button>
           </div>
 
+          {hasRider && canEditRider && !changingRider && (
+            <button
+              type="button"
+              onClick={() => {
+                setPendingRider(null)
+                setChangingRider(true)
+              }}
+              className="mt-3 w-full rounded-full bg-mist px-3 py-2.5 text-xs font-bold text-ink-soft ring-1 ring-line"
+            >
+              Change rider
+            </button>
+          )}
+
+          {hasRider && !canEditRider && !cancelled && (
+            <p className="mt-3 rounded-xl bg-mist px-3 py-2 text-sm font-semibold text-muted">
+              Rider locked after pickup — reassignment isn’t available once the
+              order is physically with them.
+            </p>
+          )}
+
+          {changingRider && canEditRider && (
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
+                Pick a new rider
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setChangingRider(false)
+                  setPendingRider(null)
+                }}
+                className="rounded-full px-2.5 py-1 text-[11px] font-bold text-muted hover:text-ink"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {pendingRider && showRiderPicker && (
+            <div className="mt-3 rounded-2xl border border-lagoon/30 bg-lagoon/5 px-3 py-3">
+              <p className="text-sm font-bold text-ink">
+                {hasRider ? 'Reassign to' : 'Assign to'} {pendingRider.name}?
+              </p>
+              <p className="mt-0.5 text-[11px] font-semibold text-muted">
+                {pendingRider.phone}
+                {pendingRider.area && pendingRider.area !== '—'
+                  ? ` · ${pendingRider.area}`
+                  : ''}
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={cancelPendingAssign}
+                  className="rounded-full bg-mist px-3 py-2 text-xs font-bold text-ink-soft"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmAssign}
+                  className="rounded-full bg-lagoon px-3 py-2 text-xs font-bold text-white"
+                >
+                  {hasRider ? 'Confirm change' : 'Confirm assign'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {ridersError && (
             <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
               {ridersError}
             </p>
           )}
 
-          {!ridersLoading && !ridersError && !riders.length && (
+          {showRiderPicker && !ridersLoading && !ridersError && !riders.length && (
             <p className="mt-3 rounded-xl border border-dashed border-line px-3 py-3 text-sm font-semibold text-muted">
               No riders in the table yet. Add them in Supabase, then refresh.
             </p>
           )}
 
-          {availableRiders.length > 0 && (
+          {showRiderPicker && availableRiders.length > 0 && (
             <div className="mt-3">
               <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">
                 On duty
@@ -812,19 +915,19 @@ export function AdminOrderPage() {
                   <RiderAssignButton
                     key={r.id}
                     rider={r}
-                    selected={order.riderId === r.id}
-                    disabled={!canAssign}
-                    onAssign={() => {
-                      setActionError(null)
-                      assignRider(order.id, r.id)
-                    }}
+                    selected={
+                      pendingRider?.id === r.id ||
+                      (!pendingRider && order.riderId === r.id)
+                    }
+                    disabled={false}
+                    onAssign={() => requestAssign(r)}
                   />
                 ))}
               </div>
             </div>
           )}
 
-          {offDutyRiders.length > 0 && (
+          {showRiderPicker && offDutyRiders.length > 0 && (
             <div className="mt-4">
               <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted/70">
                 Off duty
@@ -837,20 +940,21 @@ export function AdminOrderPage() {
                   <RiderAssignButton
                     key={r.id}
                     rider={r}
-                    selected={order.riderId === r.id}
-                    disabled={!canAssign}
+                    selected={
+                      pendingRider?.id === r.id ||
+                      (!pendingRider && order.riderId === r.id)
+                    }
+                    disabled={false}
                     deEmphasized
-                    onAssign={() => {
-                      setActionError(null)
-                      assignRider(order.id, r.id)
-                    }}
+                    onAssign={() => requestAssign(r)}
                   />
                 ))}
               </div>
             </div>
           )}
 
-          {order.status === 'finding_rider' &&
+          {showRiderPicker &&
+            !hasRider &&
             !ridersLoading &&
             availableRiders.length === 0 &&
             offDutyRiders.length > 0 && (

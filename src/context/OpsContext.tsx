@@ -322,13 +322,16 @@ export function OpsProvider({ children }: { children: ReactNode }) {
       const rider = ridersRef.current.find((r) => r.id === riderId)
       updateOrder(id, (o) => {
         if (o.fulfillment === 'pickup') return o
-        if (o.status === 'cancelled' || o.status === 'delivered') return o
+        if (
+          o.status === 'cancelled' ||
+          o.status === 'delivered' ||
+          o.status === 'picked_up' ||
+          o.status === 'on_the_way'
+        ) {
+          return o
+        }
         if (!riderId) {
-          if (
-            o.status === 'preparing' ||
-            o.status === 'picked_up' ||
-            o.status === 'on_the_way'
-          ) {
+          if (o.status === 'preparing') {
             return o
           }
           return {
@@ -338,6 +341,8 @@ export function OpsProvider({ children }: { children: ReactNode }) {
             notes: [...o.notes, note('Rider cleared — back to finding rider.')],
           }
         }
+        if (o.riderId === riderId) return o
+        const reassign = Boolean(o.riderId)
         const nextStatus: OrderStatus =
           o.status === 'finding_rider' || o.status === 'rider_assigned'
             ? 'rider_assigned'
@@ -349,7 +354,9 @@ export function OpsProvider({ children }: { children: ReactNode }) {
           notes: [
             ...o.notes,
             note(
-              `Rider assigned: ${rider?.name ?? riderId}. Kitchen may start preparing.`,
+              reassign
+                ? `Rider reassigned: ${rider?.name ?? riderId}.`
+                : `Rider assigned: ${rider?.name ?? riderId}. Kitchen may start preparing.`,
             ),
           ],
         }

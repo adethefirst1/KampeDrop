@@ -31,6 +31,32 @@ import { easeOut, springSnap } from '../motion/tokens'
 const TRACK_POLL_MS = 4000
 const TRACK_POLL_FAST_MS = 2000
 
+function orderStorageKey(orderId: string) {
+  return `kampedrop-order-${orderId}`
+}
+
+/** Rider contact may live on CloudOrder or last cloud payload in sessionStorage. */
+function readStoredRiderContact(orderId: string): {
+  riderName: string | null
+  riderPhone: string | null
+} {
+  try {
+    const raw = sessionStorage.getItem(orderStorageKey(orderId))
+    if (!raw) return { riderName: null, riderPhone: null }
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const name = parsed.riderName ?? parsed.rider_name
+    const phone = parsed.riderPhone ?? parsed.rider_phone
+    return {
+      riderName:
+        name != null && String(name).trim() !== '' ? String(name) : null,
+      riderPhone:
+        phone != null && String(phone).trim() !== '' ? String(phone) : null,
+    }
+  } catch {
+    return { riderName: null, riderPhone: null }
+  }
+}
+
 function isPaystackPaid(state: string | undefined): boolean {
   return (
     state === 'card_paid' ||
@@ -113,7 +139,7 @@ export function TrackPage() {
         setCloudOrder(result.order)
         try {
           sessionStorage.setItem(
-            `kampedrop-order-${orderId}`,
+            orderStorageKey(orderId!),
             JSON.stringify(result.order),
           )
         } catch {
@@ -345,30 +371,36 @@ export function TrackPage() {
   useEffect(() => {
     if (!orderId || !opsOrder) return
     try {
-      const raw = sessionStorage.getItem(`kampedrop-order-${orderId}`)
+      const raw = sessionStorage.getItem(orderStorageKey(orderId))
       if (!raw) {
         if (baseOrder) {
           sessionStorage.setItem(
-            `kampedrop-order-${orderId}`,
+            orderStorageKey(orderId),
             JSON.stringify(baseOrder),
           )
         }
         return
       }
-      const buyer = JSON.parse(raw) as PlacedOrder
+      const buyer = JSON.parse(raw) as PlacedOrder & {
+        riderName?: string | null
+        riderPhone?: string | null
+      }
       const nextStatus = furtherStatus(buyer.status, opsOrder.status)
+      // Preserve rider contact from last cloud pull when merging ops fields.
       sessionStorage.setItem(
-        `kampedrop-order-${orderId}`,
+        orderStorageKey(orderId),
         JSON.stringify({
           ...buyer,
           ...opsOrder,
           status: nextStatus,
+          riderName: buyer.riderName ?? cloudOrder?.riderName ?? null,
+          riderPhone: buyer.riderPhone ?? cloudOrder?.riderPhone ?? null,
         }),
       )
     } catch {
       /* ignore */
     }
-  }, [orderId, opsOrder, baseOrder])
+  }, [orderId, opsOrder, baseOrder, cloudOrder?.riderName, cloudOrder?.riderPhone])
 
   const order: PlacedOrder | null = useMemo(() => {
     if (!baseOrder) return null
@@ -391,9 +423,12 @@ export function TrackPage() {
   const pickup = fulfillment === 'pickup'
   const pipe = pipelineFor(fulfillment)
   const vendor = getVendor(order?.lines[0]?.vendorId ?? '')
-  const riderName = cloudOrder?.riderName ?? null
-  const riderPhone = cloudOrder?.riderPhone ?? null
   const cancelled = status === 'cancelled'
+  const storedRider = orderId ? readStoredRiderContact(orderId) : null
+  const riderName = cloudOrder?.riderName ?? storedRider?.riderName ?? null
+  const riderPhone = cloudOrder?.riderPhone ?? storedRider?.riderPhone ?? null
+  const showRiderContact =
+    Boolean(riderName || riderPhone) && !cancelled && !pickup
   const delivered = status === 'delivered'
   const activeIndex = cancelled ? -1 : statusRank(status, fulfillment)
   const feel = feelForStatus(status, fulfillment)
@@ -592,23 +627,39 @@ export function TrackPage() {
           <p className="mt-2 text-sm text-muted">
             {pickup
               ? 'Show this code at the vendor when you collect. That vendor handoff releases escrow — not door arrival.'
-              : 'Share this only when the rider picks up at the vendor. That handoff releases escrow; door delivery stays tracked after.'}
+              : showRiderContact
+                ? 'Call your rider below and share this code when they pick up at the vendor. That handoff releases escrow.'
+                : 'Share this only when the rider picks up at the vendor. That handoff releases escrow; door delivery stays tracked after.'}
           </p>
         </div>
       )}
 
-      {riderName && !cancelled && !pickup && (
-        <div className="mt-4 rounded-2xl bg-mist px-4 py-3 text-sm">
-          <p>
-            <span className="font-semibold">Your rider:</span> {riderName}
+      {showRiderContact && (
+        <div className="mt-4 rounded-[1.5rem] border-2 border-lagoon/30 bg-lagoon/5 px-4 py-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-lagoon">
+            Your rider
           </p>
-          {riderPhone && (
+          {riderName && (
+            <p className="mt-2 font-display text-xl font-semibold tracking-[-0.02em] text-ink">
+              {riderName}
+            </p>
+          )}
+          {riderPhone ? (
             <a
               href={`tel:${riderPhone}`}
-              className="mt-1 inline-block font-bold text-lagoon underline-offset-2 hover:underline"
+              className="mt-3 inline-flex w-full items-center justify-center rounded-full bg-ink px-4 py-3 text-sm font-extrabold text-dusk"
             >
-              {riderPhone}
+              Call {riderPhone}
             </a>
+          ) : (
+            <p className="mt-2 text-sm font-semibold text-muted">
+              Phone not on file — contact KampeDrop if you need to reach them.
+            </p>
+          )}
+          {!delivered && (
+            <p className="mt-2 text-xs font-semibold text-muted">
+              Give them your passkey at vendor pickup.
+            </p>
           )}
         </div>
       )}

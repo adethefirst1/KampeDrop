@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AddToHomeScreenTip } from '../../components/AddToHomeScreenGuide'
 import { NgPhoneField } from '../../components/NgPhoneField'
 import { SITE, whatsappHelpUrl } from '../../data/site'
 import { isValidNgMobileNational, toStoredNgPhone } from '../../lib/nigeriaPhone'
@@ -97,7 +98,15 @@ export function RiderLoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 space-y-2 text-center text-sm font-semibold text-muted">
+        <div className="mt-8">
+          <AddToHomeScreenTip
+            storageKey="kampedrop-rider-login-home-tip-hidden"
+            title="Add this board to your home screen"
+            body="After you sign in, keep the icon — opens straight to your rides."
+          />
+        </div>
+
+        <div className="mt-6 space-y-2 text-center text-sm font-semibold text-muted">
           <p>
             Have a private link?{' '}
             <Link to="/rider" className="text-ink hover:underline">
@@ -112,6 +121,11 @@ export function RiderLoginPage() {
           >
             Need help? WhatsApp us
           </a>
+          <p>
+            <Link to="/work-with-us#ride" className="hover:text-ink">
+              Interested in riding? Work with us
+            </Link>
+          </p>
         </div>
       </div>
     </div>

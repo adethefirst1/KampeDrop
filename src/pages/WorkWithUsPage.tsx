@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
+import { AddToHomeScreenGuide } from '../components/AddToHomeScreenGuide'
 import { MarketingLayout } from '../components/layout'
 import { Reveal, Stagger, MotionItem } from '../components/motion'
-import { SITE } from '../data/site'
+import { SITE, whatsappHelpUrl } from '../data/site'
 import { fadeUp, hoverLift, tapPress } from '../motion/tokens'
+
+const riderInterestWa = whatsappHelpUrl(
+  `Hi, I'm interested in riding for ${SITE.name}`,
+)
 
 const channels = [
   {
@@ -46,6 +51,21 @@ const channels = [
     href: '/vendor/login',
   },
 ] as const
+
+const riderBenefits = [
+  {
+    t: 'Paid the same day',
+    d: 'Finish the delivery, get paid that day. Cash at the door on COD; wallet credit on card and transfer.',
+  },
+  {
+    t: 'Flexible hours',
+    d: 'Go available when you can ride. Ops assigns nearby pickups from your zone.',
+  },
+  {
+    t: 'We create your account',
+    d: 'No public signup. We meet you, vet you, and set up your private rider board by hand.',
+  },
+]
 
 const stillOurs = [
   {
@@ -95,9 +115,8 @@ export function WorkWithUsPage() {
               Partner with KampeDrop.
             </h1>
             <p className="mt-5 max-w-xl text-base font-semibold leading-relaxed text-white/70 md:text-lg">
-              Registration is complimentary. Complete your profile and storefront photos —
-              we verify within 24 hours. Your business appears to customers only after
-              approval.
+              Sell from your kitchen — or ride deliveries across {SITE.area}. Vendors
+              register online; riders reach us directly. We vet every partner by hand.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
@@ -106,9 +125,15 @@ export function WorkWithUsPage() {
               >
                 Register →
               </Link>
+              <a
+                href="#ride"
+                className="inline-flex items-center justify-center rounded-full border-[3px] border-dusk bg-transparent px-5 py-3 text-sm font-extrabold text-dusk hover:bg-dusk/10"
+              >
+                Ride with us
+              </a>
               <Link
                 to="/vendor/login"
-                className="inline-flex items-center justify-center rounded-full border-[3px] border-dusk bg-transparent px-5 py-3 text-sm font-extrabold text-dusk hover:bg-dusk/10"
+                className="inline-flex items-center justify-center rounded-full border-[3px] border-white/25 bg-transparent px-5 py-3 text-sm font-extrabold text-white/80 hover:bg-white/5"
               >
                 Sign in
               </Link>
@@ -117,15 +142,15 @@ export function WorkWithUsPage() {
         </div>
       </section>
 
-      {/* Two channels */}
+      {/* Vendor channels */}
       <section className="relative bg-paper py-16 md:py-24">
         <div className="container-site">
           <Reveal>
             <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-lagoon">
-              Partner pathways
+              Sell with us
             </p>
             <h2 className="mt-3 max-w-[18ch] font-display text-3xl font-semibold tracking-[-0.03em] md:text-[2.75rem] md:leading-[1.1]">
-              How you join — or clock in.
+              How kitchens and shops join.
             </h2>
             <p className="mt-4 max-w-lg text-base leading-relaxed text-muted">
               New partners register online. Approved kitchens and shops sign in to the board.
@@ -176,6 +201,69 @@ export function WorkWithUsPage() {
         </div>
       </section>
 
+      {/* Ride with us — contact only, no signup */}
+      <section id="ride" className="relative scroll-mt-24 bg-ink py-16 text-white md:py-24">
+        <div
+          className="pointer-events-none absolute -right-10 top-20 h-40 w-40 rounded-[35%] border-4 border-ink bg-lagoon/90 opacity-90"
+          aria-hidden
+        />
+        <div className="container-site relative">
+          <Reveal>
+            <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-dusk">
+              Ride with us
+            </p>
+            <h2 className="mt-3 max-w-[16ch] font-display text-3xl font-semibold tracking-[-0.03em] md:text-[2.75rem] md:leading-[1.1]">
+              Deliver across {SITE.area}.
+            </h2>
+            <p className="mt-4 max-w-lg text-base font-semibold leading-relaxed text-white/70">
+              Same-day pay per delivery. Flexible hours. We don’t take online rider
+              applications — call or WhatsApp us, and we’ll meet you.
+            </p>
+          </Reveal>
+
+          <Stagger className="mt-10 grid gap-4 sm:grid-cols-2" as="ul" fast>
+            {riderBenefits.map((item) => (
+              <MotionItem
+                key={item.t}
+                as="li"
+                variants={fadeUp}
+                className="rounded-[1.5rem] bg-white/5 p-5 ring-1 ring-white/12"
+              >
+                <h3 className="font-display text-xl font-semibold tracking-[-0.02em] text-dusk">
+                  {item.t}
+                </h3>
+                <p className="mt-2 text-sm font-semibold leading-relaxed text-white/65">
+                  {item.d}
+                </p>
+              </MotionItem>
+            ))}
+          </Stagger>
+
+          <Reveal className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <a
+              href={`tel:${SITE.supportPhone}`}
+              className="inline-flex items-center justify-center rounded-full bg-dusk px-5 py-3.5 text-sm font-extrabold text-ink shadow-[3px_3px_0_rgba(2,10,12,0.45)]"
+            >
+              Call us · {SITE.supportPhoneDisplay}
+            </a>
+            <a
+              href={riderInterestWa}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center rounded-full border-[3px] border-dusk px-5 py-3.5 text-sm font-extrabold text-dusk hover:bg-dusk/10"
+            >
+              WhatsApp us
+            </a>
+            <Link
+              to="/rider/login"
+              className="inline-flex items-center justify-center rounded-full border-[3px] border-white/20 px-5 py-3.5 text-sm font-extrabold text-white/70 hover:bg-white/5"
+            >
+              Already a rider? Sign in
+            </Link>
+          </Reveal>
+        </div>
+      </section>
+
       {/* Still ours */}
       <section className="wave-line py-16 md:py-24">
         <div className="container-site">
@@ -203,6 +291,15 @@ export function WorkWithUsPage() {
         </div>
       </section>
 
+      {/* Home screen guide — vendors + riders */}
+      <section className="bg-paper py-16 md:py-24">
+        <div className="container-site">
+          <Reveal>
+            <AddToHomeScreenGuide />
+          </Reveal>
+        </div>
+      </section>
+
       {/* Close */}
       <section className="relative overflow-hidden bg-ink py-20 text-white md:py-28">
         <motion.div
@@ -213,20 +310,27 @@ export function WorkWithUsPage() {
         />
         <div className="container-site relative text-center">
           <Reveal>
-            <h2 className="mx-auto max-w-[16ch] font-display text-3xl font-bold tracking-[-0.03em] md:text-5xl md:leading-[1.08]">
-              Ready to sell on these roads?
+            <h2 className="mx-auto max-w-[18ch] font-display text-3xl font-bold tracking-[-0.03em] md:text-5xl md:leading-[1.08]">
+              Ready to sell — or ride?
             </h2>
             <p className="mx-auto mt-4 max-w-md text-base font-semibold text-white/65">
-              Register your kitchen, mart, or pharmacy. We vet first — then you open the board.
+              Kitchens register online. Riders call or WhatsApp us. We vet first — then
+              you open the board.
             </p>
           </Reveal>
-          <Reveal className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Reveal className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
             <Link to="/vendor/signup" className="btn-primary">
               Register your business →
             </Link>
+            <a
+              href={`tel:${SITE.supportPhone}`}
+              className="inline-flex rounded-full border-[3px] border-dusk px-5 py-3 text-sm font-extrabold text-dusk hover:bg-dusk/10"
+            >
+              Call to ride
+            </a>
             <Link
               to="/vendor/login"
-              className="inline-flex rounded-full border-[3px] border-dusk px-5 py-3 text-sm font-extrabold text-dusk hover:bg-dusk/10"
+              className="inline-flex rounded-full border-[3px] border-white/25 px-5 py-3 text-sm font-extrabold text-white/75 hover:bg-white/5"
             >
               Sign in to your board
             </Link>

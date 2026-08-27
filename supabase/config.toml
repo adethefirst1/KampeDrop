@@ -16,5 +16,11 @@ verify_jwt = false
 [functions.vendor-save-bank]
 verify_jwt = false
 
+[functions.rider-resolve-account]
+verify_jwt = false
+
+[functions.rider-save-bank]
+verify_jwt = false
+
 [functions.paystack-payout]
 verify_jwt = false

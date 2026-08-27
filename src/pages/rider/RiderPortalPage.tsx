@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { AddToHomeScreenTip } from '../../components/AddToHomeScreenGuide'
 import { useCatalog } from '../../context/CatalogContext'
 import { labelForStatus, type OpsStatus } from '../../data/ops'
 import type { Fulfillment } from '../../context/CartContext'
@@ -12,6 +13,8 @@ import {
   getRiderMe,
   getRiderOrderHistory,
   getRiderOrders,
+  getRiderWallet,
+  riderUserFacingError,
   rotateRiderToken,
   setRiderAvailability,
   updateOrderStatusByRider,
@@ -19,8 +22,11 @@ import {
   type RiderMe,
   type RiderPortalOrder,
 } from '../../lib/ridersApi'
+import { RiderWalletPanel } from './RiderWalletPanel'
 
-type Tab = 'active' | 'history'
+/** Runs filter — wallet is a separate screen, not a peer tab. */
+type RunsTab = 'active' | 'history'
+type Screen = 'runs' | 'wallet'
 
 function formatWhen(iso: string) {
   try {
@@ -215,10 +221,12 @@ export function RiderPortalPage() {
   const token = (params.get('token') ?? '').trim()
   const { getVendor } = useCatalog()
 
-  const [tab, setTab] = useState<Tab>('active')
+  const [screen, setScreen] = useState<Screen>('runs')
+  const [runsTab, setRunsTab] = useState<RunsTab>('active')
   const [rider, setRider] = useState<RiderMe | null>(null)
   const [orders, setOrders] = useState<RiderPortalOrder[]>([])
   const [history, setHistory] = useState<RiderPortalOrder[]>([])
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -232,6 +240,10 @@ export function RiderPortalPage() {
     null,
   )
 
+  const onWalletBalanceChange = useCallback((balance: number) => {
+    setWalletBalance(balance)
+  }, [])
+
   const refresh = useCallback(async () => {
     if (!token) {
       setError('Missing rider link. Ask ops for your private KampeDrop rider URL.')
@@ -242,39 +254,50 @@ export function RiderPortalPage() {
     setLoading(true)
     setError(null)
 
-    const me = await getRiderMe(token)
-    if (!me.ok) {
-      setError(me.reason)
-      setRider(null)
-      setOrders([])
-      setHistory([])
+    try {
+      const me = await getRiderMe(token)
+      if (!me.ok) {
+        setError(riderUserFacingError(me.reason))
+        setRider(null)
+        setOrders([])
+        setHistory([])
+        setWalletBalance(null)
+        setLoading(false)
+        return
+      }
+
+      setRider(me.rider)
+      setZoneDraft(me.rider.currentZone ?? '')
+
+      const [openResult, historyResult, walletResult] = await Promise.all([
+        getRiderOrders(token),
+        getRiderOrderHistory(token),
+        getRiderWallet(token),
+      ])
+
+      if (!openResult.ok) {
+        setError(riderUserFacingError(openResult.reason))
+        setOrders([])
+      } else {
+        setOrders(openResult.orders)
+      }
+
+      if (!historyResult.ok) {
+        setError((prev) => prev ?? riderUserFacingError(historyResult.reason))
+        setHistory([])
+      } else {
+        setHistory(historyResult.orders)
+      }
+
+      if (walletResult.ok) {
+        setWalletBalance(walletResult.wallet.walletBalance)
+      }
+
       setLoading(false)
-      return
+    } catch (err) {
+      setError(riderUserFacingError(err))
+      setLoading(false)
     }
-
-    setRider(me.rider)
-    setZoneDraft(me.rider.currentZone ?? '')
-
-    const [openResult, historyResult] = await Promise.all([
-      getRiderOrders(token),
-      getRiderOrderHistory(token),
-    ])
-
-    if (!openResult.ok) {
-      setError(openResult.reason)
-      setOrders([])
-    } else {
-      setOrders(openResult.orders)
-    }
-
-    if (!historyResult.ok) {
-      setError((prev) => prev ?? historyResult.reason)
-      setHistory([])
-    } else {
-      setHistory(historyResult.orders)
-    }
-
-    setLoading(false)
   }, [token])
 
   useEffect(() => {
@@ -292,7 +315,7 @@ export function RiderPortalPage() {
     )
     setAvailBusy(false)
     if (!result.ok) {
-      setAvailError(result.reason)
+      setAvailError(riderUserFacingError(result.reason))
       return
     }
     setRider((prev) =>
@@ -339,11 +362,14 @@ export function RiderPortalPage() {
     const result = await updateOrderStatusByRider(token, orderId, status)
     setBusyId(null)
     if (!result.ok) {
-      setActionError(result.reason)
+      setActionError(riderUserFacingError(result.reason))
       return
     }
     await refresh()
-    if (status === 'delivered') setTab('history')
+    if (status === 'delivered') {
+      setScreen('runs')
+      setRunsTab('history')
+    }
   }
 
   async function onLogoutEverywhere() {
@@ -353,10 +379,9 @@ export function RiderPortalPage() {
     const result = await rotateRiderToken(token)
     setLogoutBusy(false)
     if (!result.ok) {
-      setActionError(result.reason)
+      setActionError(riderUserFacingError(result.reason))
       return
     }
-    navigate('/rider/login', { replace: true })
   }
 
   const landmarkOptions = useMemo(() => curatedLandmarks, [])
@@ -388,51 +413,122 @@ export function RiderPortalPage() {
     <div className="min-h-svh bg-[#eef1f0] text-ink">
       <header className="sticky top-0 z-30 border-b border-ink/10 bg-[#e8eceb]/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-lg items-center justify-between gap-3 px-4">
-          <div className="min-w-0">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-dusk">
-              {SITE.name} · Rider
-            </p>
-            <p className="truncate font-display text-lg font-bold tracking-[-0.02em]">
-              {rider?.name ?? 'Rider board'}
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              disabled={loading}
-              className="rounded-full bg-ink/8 px-3 py-1.5 text-xs font-bold text-ink-soft ring-1 ring-ink/10"
-            >
-              {loading ? 'Refreshing…' : 'Refresh'}
-            </button>
-            <button
-              type="button"
-              onClick={() => void onLogoutEverywhere()}
-              disabled={logoutBusy}
-              title="Invalidates this private link on every device"
-              className="rounded-full px-3 py-1.5 text-xs font-bold text-muted ring-1 ring-ink/10 hover:bg-ink/5 hover:text-ink disabled:opacity-50"
-            >
-              {logoutBusy ? 'Logging out…' : 'Log out everywhere'}
-            </button>
-          </div>
+          {screen === 'wallet' ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setScreen('runs')}
+                className="shrink-0 rounded-full px-2.5 py-1.5 text-xs font-bold text-ink-soft ring-1 ring-ink/10 hover:bg-ink/5 hover:text-ink"
+              >
+                ← Runs
+              </button>
+              <p className="font-display text-lg font-bold tracking-[-0.02em]">
+                Wallet
+              </p>
+              <span className="w-[4.5rem] shrink-0" aria-hidden />
+            </>
+          ) : (
+            <>
+              <div className="min-w-0">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-dusk">
+                  {SITE.name} · Rider
+                </p>
+                <p className="truncate font-display text-lg font-bold tracking-[-0.02em]">
+                  {rider?.name ?? 'Rider board'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScreen('wallet')}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ink px-3 py-2 text-dusk shadow-[0_2px_0_rgba(6,24,28,0.35)] transition hover:bg-ink-soft active:translate-y-px"
+                aria-label={
+                  walletBalance != null
+                    ? `Wallet ${formatNaira(walletBalance)}. Open wallet.`
+                    : 'Open wallet'
+                }
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden
+                  className="shrink-0 opacity-90"
+                >
+                  <path
+                    d="M3.5 8.5A2.5 2.5 0 0 1 6 6h12.5A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20H6A2.5 2.5 0 0 1 3.5 17.5v-9Z"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                  />
+                  <path
+                    d="M3.5 10H21"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="16.5" cy="14.5" r="1.25" fill="currentColor" />
+                </svg>
+                <span className="text-sm font-extrabold tabular-nums leading-none">
+                  {walletBalance != null ? formatNaira(walletBalance) : '₦—'}
+                </span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden
+                  className="shrink-0 opacity-80"
+                >
+                  <path
+                    d="M9 5.5 15.5 12 9 18.5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       <main className="mx-auto max-w-lg px-4 py-5 pb-20">
+        {screen === 'runs' && (
+          <AddToHomeScreenTip
+            storageKey="kampedrop-rider-home-tip-hidden"
+            title="Put your rider board on the home screen"
+            body="One tap next time — Safari Share → Add to Home Screen, or Chrome ⋮ → Install app."
+          />
+        )}
+
         {error && (
           <p className="rounded-xl bg-mango/15 px-3 py-2 text-sm font-semibold text-mango-deep">
             {error}
           </p>
         )}
 
-        {rider && (
+        {screen === 'runs' && rider && (
           <section className="rounded-[1.25rem] border border-ink/10 bg-paper/90 px-4 py-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-dusk">
-              Availability
-            </p>
-            <p className="mt-1.5 text-xs font-semibold text-muted">
-              When you’re available, ops can see your zone and assign nearby pickups.
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-dusk">
+                  Availability
+                </p>
+                <p className="mt-1.5 text-xs font-semibold text-muted">
+                  When you’re available, ops can see your zone and assign nearby
+                  pickups.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void refresh()}
+                disabled={loading}
+                className="shrink-0 rounded-full bg-ink/8 px-3 py-1.5 text-xs font-bold text-ink-soft ring-1 ring-ink/10"
+              >
+                {loading ? '…' : 'Refresh'}
+              </button>
+            </div>
 
             <label className="mt-3 block">
               <span className="text-xs font-bold uppercase tracking-wide text-muted">
@@ -490,76 +586,84 @@ export function RiderPortalPage() {
           </section>
         )}
 
-        <div
-          className="mt-5 flex gap-1 rounded-full bg-ink/6 p-1"
-          role="tablist"
-          aria-label="Rider views"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'active'}
-            onClick={() => setTab('active')}
-            className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
-              tab === 'active' ? 'bg-ink text-white' : 'text-muted hover:text-ink'
-            }`}
-          >
-            Active
-            {orders.length > 0 ? (
-              <span className="ml-1 tabular-nums opacity-80">({orders.length})</span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'history'}
-            onClick={() => setTab('history')}
-            className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
-              tab === 'history' ? 'bg-ink text-white' : 'text-muted hover:text-ink'
-            }`}
-          >
-            History
-          </button>
-        </div>
+        {screen === 'runs' && (
+          <>
+            <div
+              className="mt-5 flex gap-1 rounded-full bg-ink/6 p-1"
+              role="tablist"
+              aria-label="Runs"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={runsTab === 'active'}
+                onClick={() => setRunsTab('active')}
+                className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
+                  runsTab === 'active'
+                    ? 'bg-ink text-white'
+                    : 'text-muted hover:text-ink'
+                }`}
+              >
+                Active
+                {orders.length > 0 ? (
+                  <span className="ml-1 tabular-nums opacity-80">
+                    ({orders.length})
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={runsTab === 'history'}
+                onClick={() => setRunsTab('history')}
+                className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
+                  runsTab === 'history'
+                    ? 'bg-ink text-white'
+                    : 'text-muted hover:text-ink'
+                }`}
+              >
+                History
+              </button>
+            </div>
 
-        {actionError && (
-          <p className="mt-3 rounded-xl bg-mango/15 px-3 py-2 text-sm font-semibold text-mango-deep">
-            {actionError}
-          </p>
-        )}
-
-        {tab === 'active' && (
-          <div className="mt-4 space-y-3">
-            {!loading && !orders.length && (
-              <div className="rounded-[1.25rem] border border-dashed border-ink/15 px-4 py-8 text-center">
-                <p className="font-display text-lg font-bold">No active runs</p>
-                <p className="mt-1 text-sm font-semibold text-muted">
-                  When ops assigns you an order, it shows up here.
-                </p>
-              </div>
+            {actionError && (
+              <p className="mt-3 rounded-xl bg-mango/15 px-3 py-2 text-sm font-semibold text-mango-deep">
+                {actionError}
+              </p>
             )}
 
-            {orders.map((order) => {
-              const { vendorName, pickupSpot } = orderVendorBits(
-                order,
-                getVendor,
-              )
-              const canOnTheWay = order.status === 'picked_up'
-              const canDelivered = order.status === 'on_the_way'
-
-              return (
-                <article
-                  key={order.id}
-                  className={`rounded-[1.25rem] border bg-paper/95 px-4 py-4 shadow-sm ${
-                    order.kitchenReadyAt
-                      ? 'border-ok/40 ring-2 ring-ok/20'
-                      : 'border-ink/10'
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-mono text-[11px] font-bold text-muted">
-                      {order.id}
+            {runsTab === 'active' && (
+              <div className="mt-4 space-y-3">
+                {!loading && !orders.length && (
+                  <div className="rounded-[1.25rem] border border-dashed border-ink/15 px-4 py-8 text-center">
+                    <p className="font-display text-lg font-bold">No active runs</p>
+                    <p className="mt-1 text-sm font-semibold text-muted">
+                      When ops assigns you an order, it shows up here.
                     </p>
+                  </div>
+                )}
+
+                {orders.map((order) => {
+                  const { vendorName, pickupSpot } = orderVendorBits(
+                    order,
+                    getVendor,
+                  )
+                  const canOnTheWay = order.status === 'picked_up'
+                  const canDelivered = order.status === 'on_the_way'
+
+                  return (
+                    <article
+                      key={order.id}
+                      className={`rounded-[1.25rem] border bg-paper/95 px-4 py-4 shadow-sm ${
+                        order.kitchenReadyAt
+                          ? 'border-ok/40 ring-2 ring-ok/20'
+                          : 'border-ink/10'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-mono text-[11px] font-bold text-muted">
+                          {order.id}
+                        </p>
                     <span className="rounded-full bg-dusk/30 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">
                       {labelForStatus(
                         order.status as OpsStatus,
@@ -607,50 +711,59 @@ export function RiderPortalPage() {
                 </article>
               )
             })}
-          </div>
-        )}
-
-        {tab === 'history' && (
-          <div className="mt-4 space-y-3">
-            {!loading && !history.length && (
-              <div className="rounded-[1.25rem] border border-dashed border-ink/15 px-4 py-8 text-center">
-                <p className="font-display text-lg font-bold">No deliveries yet</p>
-                <p className="mt-1 text-sm font-semibold text-muted">
-                  Completed runs will list here.
-                </p>
               </div>
             )}
 
-            {history.map((order) => {
-              const { vendorName } = orderVendorBits(order, getVendor)
-              return (
-                <button
-                  key={order.id}
-                  type="button"
-                  onClick={() => setSelectedHistory(order)}
-                  className="w-full rounded-[1.25rem] border border-ink/8 bg-paper/80 px-4 py-3 text-left transition hover:border-ink/20 hover:bg-paper active:scale-[0.99]"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold">
-                        {vendorName} → {order.customerName}
-                      </p>
-                      <p className="mt-0.5 text-[11px] font-semibold text-muted">
-                        {formatWhen(order.createdAt)} ·{' '}
-                        {order.placeName || order.address}
-                      </p>
-                      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-lagoon">
-                        Tap for receipt
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-xs font-extrabold tabular-nums text-ok">
-                      {formatNaira(order.total)}
+            {runsTab === 'history' && (
+              <div className="mt-4 space-y-3">
+                {!loading && !history.length && (
+                  <div className="rounded-[1.25rem] border border-dashed border-ink/15 px-4 py-8 text-center">
+                    <p className="font-display text-lg font-bold">No deliveries yet</p>
+                    <p className="mt-1 text-sm font-semibold text-muted">
+                      Completed runs will list here.
                     </p>
                   </div>
-                </button>
-              )
-            })}
-          </div>
+                )}
+
+                {history.map((order) => {
+                  const { vendorName } = orderVendorBits(order, getVendor)
+                  return (
+                    <button
+                      key={order.id}
+                      type="button"
+                      onClick={() => setSelectedHistory(order)}
+                      className="w-full rounded-[1.25rem] border border-ink/8 bg-paper/80 px-4 py-3 text-left transition hover:border-ink/20 hover:bg-paper active:scale-[0.99]"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold">
+                            {vendorName} → {order.customerName}
+                          </p>
+                          <p className="mt-0.5 text-[11px] font-semibold text-muted">
+                            {formatWhen(order.createdAt)} ·{' '}
+                            {order.placeName || order.address}
+                          </p>
+                          <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-lagoon">
+                            Tap for receipt
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-xs font-extrabold tabular-nums text-ok">
+                          {formatNaira(order.total)}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {screen === 'wallet' && token && (
+          <RiderWalletPanel
+            accessToken={token}
+            onBalanceChange={onWalletBalanceChange}
+          />
         )}
 
         {loading && !rider && (
@@ -658,6 +771,18 @@ export function RiderPortalPage() {
             Loading rider board…
           </p>
         )}
+
+        <div className="mt-10 text-center">
+          <button
+            type="button"
+            onClick={() => void onLogoutEverywhere()}
+            disabled={logoutBusy}
+            title="Invalidates this private link on every device"
+            className="text-xs font-bold text-muted underline-offset-2 hover:text-ink hover:underline disabled:opacity-50"
+          >
+            {logoutBusy ? 'Logging out…' : 'Log out everywhere'}
+          </button>
+        </div>
       </main>
 
       <RiderHistorySheet

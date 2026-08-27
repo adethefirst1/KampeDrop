@@ -105,6 +105,9 @@ export type CloudOrder = PlacedOrder & {
   paymentState: OpsOrder['paymentState']
   hasProblem: boolean
   riderId: string | null
+  /** From get_order_by_id join — never from a direct riders SELECT. */
+  riderName: string | null
+  riderPhone: string | null
 }
 
 function paymentStateFallback(
@@ -115,7 +118,13 @@ function paymentStateFallback(
   return 'transfer_pending'
 }
 
-export function rowToCloudOrder(row: OrderRow): CloudOrder {
+/** Order row plus optional rider contact keys from get_order_by_id jsonb. */
+type OrderTrackRow = OrderRow & {
+  rider_name?: string | null
+  rider_phone?: string | null
+}
+
+export function rowToCloudOrder(row: OrderTrackRow): CloudOrder {
   const placed = rowToPlacedOrder(row)
   return {
     ...placed,
@@ -124,6 +133,14 @@ export function rowToCloudOrder(row: OrderRow): CloudOrder {
       paymentStateFallback(placed.payment),
     hasProblem: Boolean(row.has_problem),
     riderId: row.rider_id,
+    riderName:
+      row.rider_name != null && String(row.rider_name).trim() !== ''
+        ? String(row.rider_name)
+        : null,
+    riderPhone:
+      row.rider_phone != null && String(row.rider_phone).trim() !== ''
+        ? String(row.rider_phone)
+        : null,
   }
 }
 
@@ -167,6 +184,7 @@ export function isOrderRateLimitError(message: string) {
 
 /**
  * Load one order by id via get_order_by_id RPC (guest-safe; no full table list).
+ * RPC returns jsonb: order columns + rider_name / rider_phone (null if unassigned).
  */
 export async function fetchOrderById(
   orderId: string,
@@ -199,12 +217,13 @@ export async function fetchOrderById(
     return { ok: false, reason: error.message, order: null }
   }
 
+  // jsonb object (current) — or legacy setof array during cutover
   const row = Array.isArray(data) ? data[0] : data
   if (!row || typeof row !== 'object') {
     return { ok: false, reason: 'Order not found in cloud.', order: null }
   }
 
-  return { ok: true, order: rowToCloudOrder(row as OrderRow) }
+  return { ok: true, order: rowToCloudOrder(row as OrderTrackRow) }
 }
 
 export function rowToOpsOrder(row: OrderRow): OpsOrder {

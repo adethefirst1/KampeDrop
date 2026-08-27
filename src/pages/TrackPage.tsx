@@ -18,7 +18,6 @@ import { useOps } from '../context/OpsContext'
 import {
   canCancelOrder,
   feelForStatus,
-  getRider,
   labelForStatus,
   pipelineFor,
   statusRank,
@@ -392,7 +391,8 @@ export function TrackPage() {
   const pickup = fulfillment === 'pickup'
   const pipe = pipelineFor(fulfillment)
   const vendor = getVendor(order?.lines[0]?.vendorId ?? '')
-  const rider = getRider(cloudOrder?.riderId ?? opsOrder?.riderId ?? null)
+  const riderName = cloudOrder?.riderName ?? null
+  const riderPhone = cloudOrder?.riderPhone ?? null
   const cancelled = status === 'cancelled'
   const delivered = status === 'delivered'
   const activeIndex = cancelled ? -1 : statusRank(status, fulfillment)
@@ -597,9 +597,19 @@ export function TrackPage() {
         </div>
       )}
 
-      {rider && !cancelled && !pickup && (
+      {riderName && !cancelled && !pickup && (
         <div className="mt-4 rounded-2xl bg-mist px-4 py-3 text-sm">
-          <span className="font-semibold">Rider:</span> {rider.name} · {rider.area}
+          <p>
+            <span className="font-semibold">Your rider:</span> {riderName}
+          </p>
+          {riderPhone && (
+            <a
+              href={`tel:${riderPhone}`}
+              className="mt-1 inline-block font-bold text-lagoon underline-offset-2 hover:underline"
+            >
+              {riderPhone}
+            </a>
+          )}
         </div>
       )}
 

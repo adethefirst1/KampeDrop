@@ -1,98 +1,125 @@
 import { Link } from 'react-router-dom'
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useMemo, useState } from 'react'
 import { appPath } from '../paths'
 import { motion, useReducedMotion } from 'motion/react'
 import { AppShell } from '../components/layout'
 import { MotionItem, Stagger } from '../components/motion'
 import { CategoryIcon } from '../components/CategoryIcon'
 import { ShopBackdrop, shopGreeting } from '../components/ShopBackdrop'
-import { categoryOrder, categoryThemes, shuffleCopy } from '../data/categories'
+import { categoryOrder, categoryThemes } from '../data/categories'
 import {
+  isVendorOpenNow,
   SERVICE_AREA,
-  formatNaira,
-  type MenuItem,
   type Vendor,
 } from '../data/vendors'
 import { useCatalog } from '../context/CatalogContext'
-import {
-  fadeUp,
-  slowFloatTransition,
-  springPop,
-  springSoft,
-  tapPress,
-} from '../motion/tokens'
+import { fadeUp, springPop, springSoft, tapPress } from '../motion/tokens'
 
 const MotionLink = motion.create(Link)
 
-export type FeedItem = {
-  key: string
-  vendor: Vendor
-  item: MenuItem
+function shopRecency(v: Vendor): number {
+  return (
+    Date.parse(v.createdAt || '') ||
+    Date.parse(v.submittedAt || '') ||
+    0
+  )
 }
 
-function buildCatalog(vendors: Vendor[]): FeedItem[] {
-  const rows: FeedItem[] = []
-  for (const vendor of vendors) {
-    for (const item of vendor.items) {
-      if (item.available === false) continue
-      rows.push({ key: `${vendor.id}:${item.id}`, vendor, item })
-    }
-  }
-  return rows
+/** Open first (newest within), then closed (newest within). */
+export function sortShopsForBrowse(vendors: Vendor[]): Vendor[] {
+  return [...vendors].sort((a, b) => {
+    const aOpen = isVendorOpenNow(a) ? 1 : 0
+    const bOpen = isVendorOpenNow(b) ? 1 : 0
+    if (aOpen !== bOpen) return bOpen - aOpen
+    return shopRecency(b) - shopRecency(a)
+  })
 }
 
-function matchesQuery(row: FeedItem, q: string) {
+function shopMatchesQuery(vendor: Vendor, q: string): boolean {
   const hay = [
-    row.item.name,
-    row.item.description,
-    row.vendor.name,
-    row.vendor.area,
-    row.vendor.tagline,
-    categoryThemes[row.vendor.category].label,
+    vendor.name,
+    vendor.area,
+    vendor.tagline,
+    vendor.about,
+    categoryThemes[vendor.category].label,
+    ...vendor.items.map((i) => `${i.name} ${i.description}`),
   ]
     .join(' ')
     .toLowerCase()
   return hay.includes(q)
 }
 
-/** Shop home — atmosphere, portal categories, merchandised feed. */
+function ShopCard({
+  vendor,
+  reduce,
+}: {
+  vendor: Vendor
+  reduce: boolean | null
+}) {
+  const theme = categoryThemes[vendor.category]
+  const open = isVendorOpenNow(vendor)
+
+  return (
+    <MotionLink
+      to={appPath(`/vendors/${vendor.id}`)}
+      className={`flex items-center gap-3 rounded-[1.35rem] border-[2px] bg-paper/95 p-3.5 shadow-[3px_3px_0_rgba(6,24,28,0.08)] ${
+        open ? 'border-ink/80' : 'border-ink/40 opacity-90'
+      }`}
+      whileHover={reduce ? undefined : { y: -3 }}
+      whileTap={tapPress}
+    >
+      <span
+        className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border-2 border-ink/10"
+        style={{
+          background: theme.accentSoft,
+          color: theme.accent,
+        }}
+        aria-hidden
+      >
+        <CategoryIcon category={vendor.category} className="h-6 w-6" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-semibold leading-snug">{vendor.name}</h3>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {open ? (
+              <span className="text-xs font-bold text-muted">~{vendor.etaMins}m</span>
+            ) : (
+              <span className="rounded-full bg-ink/10 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-ink-soft">
+                Closed
+              </span>
+            )}
+          </div>
+        </div>
+        <p className="mt-0.5 text-[11px] font-extrabold" style={{ color: theme.accent }}>
+          {theme.label} · {vendor.area}
+        </p>
+        {vendor.tagline ? (
+          <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-muted">
+            {vendor.tagline}
+          </p>
+        ) : null}
+      </div>
+    </MotionLink>
+  )
+}
+
+/** Shop home — greeting, compact categories, open-first shops. */
 export function BrowsePage() {
   const { activeVendors } = useCatalog()
   const reduce = useReducedMotion()
-  const [picked, setPicked] = useState<FeedItem[]>([])
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query.trim().toLowerCase())
   const [greeting] = useState(() => shopGreeting())
 
-  const catalog = useMemo(
-    () => buildCatalog(activeVendors),
-    [activeVendors],
-  )
-
-  useEffect(() => {
-    setPicked(shuffleCopy(catalog).slice(0, 24))
-  }, [catalog])
-
   const searching = deferredQuery.length > 0
-  const feed = useMemo(() => {
-    if (!searching) return picked
-    return catalog.filter((row) => matchesQuery(row, deferredQuery))
-  }, [searching, picked, catalog, deferredQuery])
 
-  const matchingShops = useMemo(() => {
-    if (!searching) return []
-    return activeVendors.filter((v) => {
-      const hay = [
-        v.name,
-        v.area,
-        v.tagline,
-        categoryThemes[v.category].label,
-      ]
-        .join(' ')
-        .toLowerCase()
-      return hay.includes(deferredQuery)
-    })
-  }, [searching, activeVendors, deferredQuery])
+  const shops = useMemo(() => {
+    const base = searching
+      ? activeVendors.filter((v) => shopMatchesQuery(v, deferredQuery))
+      : activeVendors
+    return sortShopsForBrowse(base)
+  }, [activeVendors, searching, deferredQuery])
 
   return (
     <AppShell wash="shop">
@@ -105,55 +132,18 @@ export function BrowsePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={springSoft}
         >
-          {!reduce && (
-            <>
-              <motion.svg
-                className="pointer-events-none absolute -right-1 top-4 h-[4.5rem] w-[4.5rem] text-mango/30"
-                viewBox="0 0 64 64"
-                fill="none"
-                animate={{ y: [0, -7, 0], rotate: [0, 4, 0] }}
-                transition={slowFloatTransition}
-                aria-hidden
-              >
-                <ellipse cx="32" cy="42" rx="18" ry="7" fill="currentColor" />
-                <path
-                  d="M16 40c2-11 9-20 16-20s14 9 16 20"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M28 16c0-3 2-6 4-6s4 3 4 6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </motion.svg>
-              <motion.svg
-                className="pointer-events-none absolute -left-2 bottom-3 h-12 w-12 text-lagoon/25"
-                viewBox="0 0 48 48"
-                fill="currentColor"
-                animate={{ y: [0, 5, 0], rotate: [0, -6, 0] }}
-                transition={{ ...slowFloatTransition, duration: 6.2 }}
-                aria-hidden
-              >
-                <path d="M10 34c4-10 12-16 20-10 6 4 8 12 4 16-6 6-18 4-24-6Z" />
-              </motion.svg>
-            </>
-          )}
-
           <p className="relative text-[11px] font-extrabold uppercase tracking-[0.16em] text-mango-deep">
             {greeting} · {SERVICE_AREA}
           </p>
-          <h1 className="relative mt-2 max-w-[12ch] font-display text-[2.05rem] font-semibold leading-[1.05] tracking-[-0.035em] text-ink">
+          <h1 className="relative mt-2 max-w-[12ch] font-display text-[1.85rem] font-bold leading-[1.05] tracking-[-0.03em] text-ink sm:text-[2.1rem]">
             What do you need?
           </h1>
           <p className="relative mt-2 max-w-[18rem] text-sm leading-relaxed text-muted">
-            Someone’s got you — search, pick a vibe, or scroll finds nearby.
+            Someone’s got you — search a shop, pick a vibe, or scroll who’s open nearby.
           </p>
 
           <label className="relative mt-4 block">
-            <span className="sr-only">Search shops and items</span>
+            <span className="sr-only">Search shops</span>
             <span
               className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-lagoon"
               aria-hidden
@@ -178,7 +168,7 @@ export function BrowsePage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search jollof, soap, pharmacy…"
+              placeholder="Search shops, area, jollof…"
               autoComplete="off"
               enterKeyHint="search"
               className="w-full rounded-[1.15rem] border-[2.5px] border-ink/85 bg-paper/95 py-3.5 pl-11 pr-11 text-sm font-semibold tracking-[-0.01em] text-ink shadow-[2px_2px_0_rgba(6,24,28,0.08)] outline-none placeholder:font-medium placeholder:text-muted/80 focus:border-lagoon focus:ring-2 focus:ring-lagoon/20"
@@ -196,188 +186,106 @@ export function BrowsePage() {
         </motion.div>
 
         {!searching && (
-          <div className="relative mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {categoryOrder.map((id, i) => {
-              const theme = categoryThemes[id]
-              return (
-                <MotionLink
-                  key={id}
-                  to={appPath(`/category/${id}`)}
-                  className="relative overflow-hidden rounded-[1.35rem] border-[2.5px] border-ink/85 px-3 pb-3.5 pt-3 shadow-[3px_3px_0_rgba(6,24,28,0.1)]"
-                  style={{ background: theme.wash, color: theme.ink }}
-                  initial={reduce ? false : { opacity: 0, y: 14, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ ...springPop, delay: 0.04 * i }}
-                  whileHover={reduce ? undefined : { y: -4, rotate: -1 }}
-                  whileTap={tapPress}
-                >
-                  <span
-                    className="relative z-[1] grid h-12 w-12 place-items-center rounded-2xl border-2 border-ink/10"
-                    style={{ background: theme.accentSoft, color: theme.accent }}
-                  >
-                    <CategoryIcon category={id} className="h-6 w-6" />
-                  </span>
-                  <p className="relative z-[1] mt-2.5 text-sm font-extrabold tracking-[-0.02em]">
-                    {theme.label}
-                  </p>
-                  <p className="relative z-[1] mt-0.5 text-[10px] font-semibold leading-snug opacity-65">
-                    {theme.hint}
-                  </p>
-                </MotionLink>
-              )
-            })}
-          </div>
+          <nav className="relative mt-5" aria-label="Categories">
+            <p className="text-center text-[10px] font-extrabold uppercase tracking-[0.22em] text-muted/70">
+              Pick a vibe
+            </p>
+            <ul className="mt-3 grid grid-cols-4 gap-1 sm:gap-2">
+              {categoryOrder.map((id, i) => {
+                const theme = categoryThemes[id]
+                return (
+                  <li key={id} className="min-w-0">
+                    <MotionLink
+                      to={appPath(`/category/${id}`)}
+                      className="group flex flex-col items-center gap-2 px-0.5 py-1 text-center"
+                      initial={reduce ? false : { opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ ...springPop, delay: 0.045 * i }}
+                      whileHover={
+                        reduce
+                          ? undefined
+                          : { y: -4, rotate: i % 2 === 0 ? -1.5 : 1.5 }
+                      }
+                      whileTap={tapPress}
+                    >
+                      <span
+                        className={`relative block ${
+                          i % 2 === 0 ? '-rotate-3' : 'rotate-3'
+                        }`}
+                      >
+                        <span
+                          className="grid h-[3.35rem] w-[3.35rem] place-items-center rounded-[1.35rem] transition duration-200 group-hover:scale-[1.06] sm:h-14 sm:w-14"
+                          style={{
+                            background: theme.accentSoft,
+                            color: theme.accent,
+                            boxShadow: `3px 3px 0 0 ${theme.accent}40`,
+                          }}
+                          aria-hidden
+                        >
+                          <CategoryIcon
+                            category={id}
+                            className="h-7 w-7 sm:h-8 sm:w-8"
+                          />
+                        </span>
+                      </span>
+                      <span
+                        className="max-w-full truncate text-[11px] font-extrabold leading-tight tracking-[-0.02em] sm:text-xs"
+                        style={{ color: theme.ink }}
+                      >
+                        {theme.label}
+                      </span>
+                    </MotionLink>
+                  </li>
+                )
+              })}
+            </ul>
+          </nav>
         )}
       </div>
 
-      {searching && matchingShops.length > 0 && (
-        <>
-          <div className="mt-7 flex items-end justify-between gap-3">
-            <div>
-              <h2 className="font-display text-[1.35rem] font-semibold tracking-[-0.02em]">
-                Shops
-              </h2>
-              <p className="mt-0.5 text-xs font-semibold text-muted">
-                Matching “{query.trim()}”
-              </p>
-            </div>
-            <p className="shrink-0 rounded-full bg-ink/5 px-2.5 py-1 text-[11px] font-bold text-muted">
-              {matchingShops.length}
-            </p>
-          </div>
-          <Stagger className="mt-3 space-y-2.5" as="ul" fast immediate>
-            {matchingShops.map((vendor) => {
-              const theme = categoryThemes[vendor.category]
-              return (
-                <MotionItem key={vendor.id} as="li" variants={fadeUp}>
-                  <MotionLink
-                    to={appPath(`/vendors/${vendor.id}`)}
-                    className="flex items-center gap-3 rounded-[1.35rem] border-[2px] border-ink/80 bg-paper/95 p-3.5 shadow-[3px_3px_0_rgba(6,24,28,0.08)]"
-                    whileHover={reduce ? undefined : { y: -3 }}
-                    whileTap={tapPress}
-                  >
-                    <span
-                      className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border-2 border-ink/10"
-                      style={{
-                        background: theme.accentSoft,
-                        color: theme.accent,
-                      }}
-                      aria-hidden
-                    >
-                      <CategoryIcon category={vendor.category} className="h-6 w-6" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-semibold leading-snug">{vendor.name}</h3>
-                        <span className="shrink-0 text-xs font-bold text-muted">
-                          ~{vendor.etaMins}m
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-[11px] font-extrabold" style={{ color: theme.accent }}>
-                        {theme.label} · {vendor.area}
-                      </p>
-                    </div>
-                  </MotionLink>
-                </MotionItem>
-              )
-            })}
-          </Stagger>
-        </>
-      )}
-
-      {(feed.length > 0 || !searching || matchingShops.length === 0) && (
-        <div className="mt-8 flex items-end justify-between gap-3">
-          <div>
-            <h2 className="font-display text-[1.35rem] font-semibold tracking-[-0.02em]">
-              {searching ? 'Items' : 'Picked for you'}
-            </h2>
-            <p className="mt-0.5 text-xs font-semibold text-muted">
-              {searching
-                ? `Results for “${query.trim()}”`
-                : 'Neighbourhood finds · fresh shuffle'}
-            </p>
-          </div>
-          <p className="shrink-0 rounded-full bg-ink/5 px-2.5 py-1 text-[11px] font-bold text-muted">
-            {searching ? `${feed.length} found` : `${activeVendors.length} shops`}
+      <div className="mt-6 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="font-display text-[1.35rem] font-semibold tracking-[-0.02em]">
+            Shops
+          </h2>
+          <p className="mt-0.5 text-xs font-semibold text-muted">
+            {searching
+              ? `Matching “${query.trim()}”`
+              : 'Open first · newest nearby'}
           </p>
         </div>
-      )}
+        <p className="shrink-0 rounded-full bg-ink/5 px-2.5 py-1 text-[11px] font-bold text-muted">
+          {shops.length}
+        </p>
+      </div>
 
-      {feed.length === 0 ? (
-        searching && matchingShops.length > 0 ? null : (
-          <div className="mt-6 rounded-[1.5rem] border-[3px] border-dashed border-ink/20 bg-paper/80 px-5 py-10 text-center">
-            <p className="font-display text-xl font-semibold tracking-[-0.02em]">
-              {searching ? 'Nothing matched' : 'Items opening soon'}
-            </p>
-            <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted">
-              {searching
-                ? 'Try another word — item name, shop, or category.'
-                : 'We’re stocking vetted shops in Badagry. Check back shortly.'}
-            </p>
-            {searching ? (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                className="btn-ink mt-5 inline-flex"
-              >
-                Clear search
-              </button>
-            ) : null}
-          </div>
-        )
+      {shops.length === 0 ? (
+        <div className="mt-6 rounded-[1.5rem] border-[3px] border-dashed border-ink/20 bg-paper/80 px-5 py-10 text-center">
+          <p className="font-display text-xl font-semibold tracking-[-0.02em]">
+            {searching ? 'Nothing matched' : 'Shops opening soon'}
+          </p>
+          <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted">
+            {searching
+              ? 'Try another word — shop name, area, or what you’re craving.'
+              : 'We’re stocking vetted shops in Badagry. Check back shortly.'}
+          </p>
+          {searching ? (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              className="btn-ink mt-5 inline-flex"
+            >
+              Clear search
+            </button>
+          ) : null}
+        </div>
       ) : (
-        <Stagger className="mt-4 space-y-3" as="ul" fast immediate>
-          {feed.map(({ key, vendor, item }, index) => {
-            const theme = categoryThemes[vendor.category]
-            return (
-              <MotionItem key={key} as="li" variants={fadeUp}>
-                <MotionLink
-                  to={appPath(`/vendors/${vendor.id}?item=${encodeURIComponent(item.id)}`)}
-                  className="group relative flex items-center gap-3.5 overflow-hidden rounded-[1.4rem] border-[2px] border-ink/80 bg-paper/95 p-3 shadow-[3px_3px_0_rgba(6,24,28,0.08)]"
-                  whileHover={
-                    reduce
-                      ? undefined
-                      : { y: -3, rotate: index % 2 === 0 ? -0.4 : 0.4 }
-                  }
-                  whileTap={tapPress}
-                  transition={springSoft}
-                >
-                  <span
-                    className="relative grid h-[3.75rem] w-[3.75rem] shrink-0 place-items-center rounded-[1.1rem] border-2 border-ink/10"
-                    style={{
-                      background: theme.accentSoft,
-                      color: theme.accent,
-                    }}
-                    aria-hidden
-                  >
-                    <CategoryIcon
-                      category={vendor.category}
-                      className="h-7 w-7"
-                    />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold leading-snug tracking-[-0.015em]">
-                        {item.name}
-                      </h3>
-                      <span className="shrink-0 rounded-full bg-ink px-2.5 py-1 text-xs font-extrabold text-paper">
-                        {formatNaira(item.price)}
-                      </span>
-                    </div>
-                    <p
-                      className="mt-1 text-[11px] font-extrabold"
-                      style={{ color: theme.accent }}
-                    >
-                      {theme.label} · {vendor.name}
-                    </p>
-                    <p className="mt-0.5 text-[11px] font-semibold text-muted">
-                      {vendor.area} · ~{vendor.etaMins}m
-                    </p>
-                  </div>
-                </MotionLink>
-              </MotionItem>
-            )
-          })}
+        <Stagger className="mt-3 space-y-2.5" as="ul" fast immediate>
+          {shops.map((vendor) => (
+            <MotionItem key={vendor.id} as="li" variants={fadeUp}>
+              <ShopCard vendor={vendor} reduce={reduce} />
+            </MotionItem>
+          ))}
         </Stagger>
       )}
 

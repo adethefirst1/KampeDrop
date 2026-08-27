@@ -11,6 +11,8 @@ import {
   categoryLabel,
   formatNaira,
   isBuyerVisible,
+  isVendorOpenNow,
+  vendorCanTakeOrders,
   type MenuItem,
 } from '../data/vendors'
 import { fadeUp, springSnap, tapPress } from '../motion/tokens'
@@ -84,7 +86,19 @@ export function VendorPage() {
     return lines.find((l) => l.item.id === itemId)?.qty ?? 0
   }
 
+  const menuItems = vendor.items.filter((it) => it.available !== false)
+  const openNow = isVendorOpenNow(vendor)
+  const canOrder = vendorCanTakeOrders(vendor)
+
   function onAdd(item: MenuItem) {
+    if (!canOrder) {
+      flash(
+        openNow
+          ? 'This shop paused new orders for now.'
+          : 'This shop is closed right now. Browse the menu, order when they open.',
+      )
+      return
+    }
     const result = addItem(vendor!.id, item)
     if (!result.ok && result.code === 'vendor_conflict') {
       setPendingItem(item)
@@ -95,13 +109,15 @@ export function VendorPage() {
 
   function confirmReplaceCart() {
     if (!pendingItem || !vendor) return
+    if (!canOrder) {
+      setPendingItem(null)
+      return
+    }
     clear()
     const result = addItem(vendor.id, pendingItem)
     setPendingItem(null)
     flash(result.ok ? `Cart cleared · added ${pendingItem.name}` : result.reason)
   }
-
-  const menuItems = vendor.items.filter((it) => it.available !== false)
 
   return (
     <AppShell showInstallTip={false}>
@@ -142,14 +158,24 @@ export function VendorPage() {
             <span className="rounded-lg bg-mist px-2 py-1">~{vendor.etaMins} min</span>
             <span className="rounded-lg bg-mist px-2 py-1">★ {vendor.rating}</span>
             <span className="rounded-lg bg-mango/15 px-2 py-1 text-mango-deep">Vetted</span>
-            {!vendor.acceptingOrders && (
+            {!openNow && (
+              <span className="rounded-lg bg-ink/10 px-2 py-1 text-ink-soft">Closed</span>
+            )}
+            {openNow && !vendor.acceptingOrders && (
               <span className="rounded-lg bg-ink/10 px-2 py-1 text-ink-soft">Paused</span>
             )}
           </div>
         </div>
       </div>
 
-      {!vendor.acceptingOrders && (
+      {!openNow && (
+        <p className="mt-3 rounded-xl bg-mist px-3 py-2.5 text-sm font-semibold text-ink-soft">
+          This shop is closed right now. You can browse the menu — ordering unlocks when
+          they open
+          {vendor.hours ? ` (${vendor.hours})` : ''}.
+        </p>
+      )}
+      {openNow && !vendor.acceptingOrders && (
         <p className="mt-3 rounded-xl bg-mist px-3 py-2.5 text-sm font-semibold text-ink-soft">
           This shop paused new orders for now. Browse another vendor nearby.
         </p>
@@ -193,7 +219,7 @@ export function VendorPage() {
                   </p>
                 </div>
 
-                {vendor.acceptingOrders &&
+                {canOrder &&
                   (qty === 0 ? (
                     <motion.button
                       type="button"

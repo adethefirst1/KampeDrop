@@ -61,52 +61,24 @@ const marketingNav = [
   { to: '/guarantee', label: 'Guarantee', short: 'Guarantee' },
 ]
 
-export function MarketingHeader({ transparent = false }: { transparent?: boolean }) {
+export function MarketingHeader() {
   const { itemCount } = useCart()
   const location = useLocation()
   const reduce = useReducedMotion()
-  const [overHero, setOverHero] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
-
-  useEffect(() => {
-    if (!transparent || location.pathname !== '/') {
-      setOverHero(false)
-      return
-    }
-
-    const update = () => {
-      setOverHero(window.scrollY < window.innerHeight * 0.55)
-    }
-
-    update()
-    window.addEventListener('scroll', update, { passive: true })
-    window.addEventListener('resize', update)
-    return () => {
-      window.removeEventListener('scroll', update)
-      window.removeEventListener('resize', update)
-    }
-  }, [transparent, location.pathname])
 
   useEffect(() => {
     setMenuOpen(false)
   }, [location.pathname])
 
-  const onHero = transparent && location.pathname === '/' && overHero
-  // Cart only when shopping — or once the paper bar is on (past first paint).
-  const showCart = itemCount > 0 || !onHero
-
   return (
     <>
       <header
-        className={`sticky top-0 z-50 transition-[background-color,border-color,box-shadow,color] duration-300 ${
-          onHero
-            ? 'border-b border-transparent bg-transparent text-white'
-            : 'border-b border-line/50 bg-[#fffaf4]/94 text-ink shadow-[0_8px_28px_rgba(6,24,28,0.06)] backdrop-blur-md'
-        }`}
+        className="sticky top-0 z-50 border-b border-line/70 bg-paper/95 text-ink backdrop-blur-md"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="container-site flex h-14 items-center justify-between gap-2 md:h-[4.25rem] md:gap-4">
-          <Logo light={onHero} />
+          <Logo />
 
           <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">
             {marketingNav.map((item) => (
@@ -116,12 +88,8 @@ export function MarketingHeader({ transparent = false }: { transparent?: boolean
                 className={({ isActive }) =>
                   `rounded-full px-3.5 py-2 text-sm font-semibold transition ${
                     isActive
-                      ? onHero
-                        ? 'bg-white/18 text-white'
-                        : 'bg-mango/12 text-mango-deep'
-                      : onHero
-                        ? 'text-white/75 hover:bg-white/10 hover:text-white'
-                        : 'text-muted hover:bg-mist hover:text-ink'
+                      ? 'bg-mist text-ink'
+                      : 'text-muted hover:bg-mist hover:text-ink'
                   }`
                 }
               >
@@ -130,15 +98,10 @@ export function MarketingHeader({ transparent = false }: { transparent?: boolean
             ))}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-            {/* Mobile: Menu holds How / Sell / Guarantee — one row only */}
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <button
               type="button"
-              className={`inline-flex h-10 items-center justify-center rounded-full px-3 text-xs font-bold transition md:hidden ${
-                onHero
-                  ? 'text-white/90 hover:bg-white/12'
-                  : 'text-ink-soft hover:bg-mist'
-              }`}
+              className="inline-flex h-10 items-center justify-center rounded-full px-3 text-xs font-bold text-ink-soft transition hover:bg-mist md:hidden"
               aria-expanded={menuOpen}
               aria-controls="marketing-menu"
               onClick={() => setMenuOpen(true)}
@@ -146,39 +109,27 @@ export function MarketingHeader({ transparent = false }: { transparent?: boolean
               Menu
             </button>
 
-            {showCart && (
-              <Link
-                to={appPath('/cart')}
-                className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
-                  onHero
-                    ? 'text-white hover:bg-white/15'
-                    : 'text-ink hover:bg-mango/10'
-                }`}
-                aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
-              >
-                <CartIcon />
-                {itemCount > 0 && (
-                  <motion.span
-                    key={itemCount}
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={springSnap}
-                    className="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white"
-                  >
-                    {itemCount}
-                  </motion.span>
-                )}
-              </Link>
-            )}
-
-            <AppEntryButton
-              className={`inline-flex items-center justify-center rounded-full px-3.5 py-2.5 text-xs font-extrabold transition sm:px-4 sm:text-sm ${
-                onHero
-                  ? 'bg-white text-ink hover:bg-white/90'
-                  : 'bg-mango text-white shadow-[0_3px_0_#9a4f16] hover:bg-mango-deep'
-              }`}
+            <Link
+              to={appPath('/cart')}
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-ink transition hover:bg-mist"
+              aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
             >
-              Order
+              <CartIcon />
+              {itemCount > 0 && (
+                <motion.span
+                  key={itemCount}
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={springSnap}
+                  className="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mango px-1 text-[11px] font-bold text-white"
+                >
+                  {itemCount}
+                </motion.span>
+              )}
+            </Link>
+
+            <AppEntryButton className="inline-flex items-center justify-center rounded-full bg-mango px-3 py-2 text-xs font-extrabold text-white shadow-[0_3px_0_#9a4f16] transition hover:bg-mango-deep sm:px-3.5 sm:py-2.5 sm:text-sm">
+              Order now
             </AppEntryButton>
           </div>
         </div>
@@ -307,19 +258,13 @@ function CartIcon() {
 function TrackIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
       <path
-        d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21"
+        d="M12 21s6.5-5.2 6.5-10.2A6.5 6.5 0 0 0 12 4.3a6.5 6.5 0 0 0-6.5 6.5C5.5 15.8 12 21 12 21Z"
         stroke="currentColor"
         strokeWidth="1.8"
-        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-      <path
-        d="M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
+      <circle cx="12" cy="10.8" r="2.2" stroke="currentColor" strokeWidth="1.8" />
     </svg>
   )
 }
@@ -363,10 +308,11 @@ function AppHeader() {
           )}
           <Link
             to={appPath('/find-order')}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-soft transition hover:bg-mango/10 hover:text-ink"
-            aria-label="Track order"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-soft transition hover:bg-mist hover:text-ink sm:w-auto sm:gap-1.5 sm:px-2.5"
+            aria-label="Find my order"
           >
             <TrackIcon />
+            <span className="hidden text-xs font-semibold sm:inline">Track</span>
           </Link>
           <Link
             to={appPath('/cart')}
@@ -605,18 +551,16 @@ export function StickyCommerceBar({ children }: { children: ReactNode }) {
 
 export function MarketingLayout({
   children,
-  transparentHeader = false,
   withCartBar = false,
   showInstall = false,
 }: {
   children: ReactNode
-  transparentHeader?: boolean
   withCartBar?: boolean
   showInstall?: boolean
 }) {
   return (
     <div className="min-h-svh mist-wash text-ink">
-      <MarketingHeader transparent={transparentHeader} />
+      <MarketingHeader />
       <main>{children}</main>
       <SiteFooter />
       {withCartBar && <BottomCartBar />}

@@ -23,6 +23,8 @@ export type VendorRow = {
   area: string
   phone: string
   hours: string | null
+  open_time: string | null
+  close_time: string | null
   about: string | null
   lat: number | null
   lng: number | null
@@ -565,7 +567,7 @@ export async function fetchOpsVendors(): Promise<
   const { data, error } = await supabase
     .from('vendors')
     .select(
-      'id, name, category, area, phone, hours, about, lat, lng, verification_status, review_note, active, submitted_at, created_at',
+      'id, name, category, area, phone, hours, open_time, close_time, about, lat, lng, verification_status, review_note, active, submitted_at, created_at',
     )
     .order('submitted_at', { ascending: false })
 
@@ -615,7 +617,7 @@ export async function fetchLiveVendors(): Promise<
   const { data, error } = await supabase
     .from('vendors')
     .select(
-      'id, name, category, area, phone, hours, about, lat, lng, verification_status, review_note, active, submitted_at, created_at',
+      'id, name, category, area, phone, hours, open_time, close_time, about, lat, lng, verification_status, review_note, active, submitted_at, created_at',
     )
     .eq('verification_status', 'approved')
     .eq('active', true)
@@ -657,6 +659,8 @@ export function vendorRowToVendor(
     vettedNote: 'Verified by KampeDrop for Badagry fulfilment.',
     phone: row.phone,
     hours: row.hours?.trim() || 'Hours on request',
+    openTime: row.open_time != null ? String(row.open_time) : null,
+    closeTime: row.close_time != null ? String(row.close_time) : null,
     lat: row.lat,
     lng: row.lng,
     photos,
@@ -665,6 +669,7 @@ export function vendorRowToVendor(
     verificationStatus:
       (row.verification_status as VerificationStatus) || 'approved',
     submittedAt: row.submitted_at,
+    createdAt: row.created_at ?? null,
     reviewNote: row.review_note,
     accessPin: '',
     items,

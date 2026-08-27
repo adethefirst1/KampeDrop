@@ -83,6 +83,14 @@ function normalizeVendor(raw: Vendor): Vendor {
     phone: raw.phone ?? seed?.phone ?? '',
     about: raw.about || seed?.about || raw.tagline || '',
     hours: raw.hours || seed?.hours || 'Hours on request',
+    openTime:
+      raw.openTime != null
+        ? raw.openTime
+        : (seed?.openTime ?? null),
+    closeTime:
+      raw.closeTime != null
+        ? raw.closeTime
+        : (seed?.closeTime ?? null),
     lat: typeof raw.lat === 'number' ? raw.lat : (seed?.lat ?? null),
     lng: typeof raw.lng === 'number' ? raw.lng : (seed?.lng ?? null),
     photos:
@@ -96,6 +104,7 @@ function normalizeVendor(raw: Vendor): Vendor {
       (raw.area ? `${raw.area} — ${raw.name}` : raw.name),
     verificationStatus,
     submittedAt: raw.submittedAt ?? null,
+    createdAt: raw.createdAt ?? seed?.createdAt ?? null,
     reviewNote: raw.reviewNote ?? null,
     accessPin: raw.accessPin?.trim() || VENDOR_DEMO_PIN,
     active: verificationStatus === 'approved' ? raw.active !== false : false,

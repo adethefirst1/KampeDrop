@@ -51,7 +51,7 @@ export function HomePage() {
   const { activeVendors } = useCatalog()
 
   return (
-    <MarketingLayout transparentHeader showInstall>
+    <MarketingLayout showInstall>
       <CartoonHero />
 
       <NeighbourhoodMarquee />

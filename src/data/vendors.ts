@@ -33,8 +33,14 @@ export type Vendor = {
   accent: string
   vettedNote: string
   phone: string
-  /** Display hours — vendor may edit */
+  /** Display hours — vendor may edit; never used for open/closed logic */
   hours: string
+  /**
+   * Structured open window in Africa/Lagos (HH:MM or HH:MM:SS).
+   * Both null until ops configures — treated as closed for ordering.
+   */
+  openTime: string | null
+  closeTime: string | null
   /** Map pin — ops-locked */
   lat: number | null
   lng: number | null
@@ -48,6 +54,8 @@ export type Vendor = {
   verificationStatus: VerificationStatus
   /** Set when vendor submits a complete application */
   submittedAt: string | null
+  /** Cloud created_at — used for newest-first shop sort */
+  createdAt: string | null
   /** Ops note when needs_info / rejected */
   reviewNote: string | null
   /** Simple access PIN for vendor board (pilot) */
@@ -78,6 +86,60 @@ export function isBuyerVisible(vendor: Vendor) {
   return vendor.active && vendor.verificationStatus === 'approved'
 }
 
+/** Parse "HH:MM" / "HH:MM:SS" → minutes from midnight, or null. */
+export function parseClockToMinutes(raw: string | null | undefined): number | null {
+  if (!raw) return null
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(raw.trim())
+  if (!m) return null
+  const h = Number(m[1])
+  const min = Number(m[2])
+  if (!Number.isFinite(h) || !Number.isFinite(min) || h > 23 || min > 59) return null
+  return h * 60 + min
+}
+
+/** Local Africa/Lagos clock as minutes from midnight. */
+export function westAfricaMinutesNow(at: Date = new Date()): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Lagos',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(at)
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? NaN)
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? NaN)
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0
+  return hour * 60 + minute
+}
+
+/**
+ * Mirror of SQL is_vendor_open_at — WAT, midnight-safe.
+ * Null / equal times → closed.
+ */
+export function isVendorOpenAt(
+  openTime: string | null | undefined,
+  closeTime: string | null | undefined,
+  at: Date = new Date(),
+): boolean {
+  const open = parseClockToMinutes(openTime)
+  const close = parseClockToMinutes(closeTime)
+  if (open === null || close === null) return false
+  if (open === close) return false
+  const now = westAfricaMinutesNow(at)
+  if (open < close) return now >= open && now < close
+  return now >= open || now < close
+}
+
+export function isVendorOpenNow(vendor: Pick<Vendor, 'openTime' | 'closeTime'>): boolean {
+  return isVendorOpenAt(vendor.openTime, vendor.closeTime)
+}
+
+/** Pause switch AND clock — both required to add to cart / checkout. */
+export function vendorCanTakeOrders(
+  vendor: Pick<Vendor, 'acceptingOrders' | 'openTime' | 'closeTime'>,
+): boolean {
+  return vendor.acceptingOrders !== false && isVendorOpenNow(vendor)
+}
+
 export function normalizePhoneDigits(phone: string) {
   return phone.replace(/\D/g, '')
 }
@@ -99,6 +161,9 @@ export const seedVendors: Vendor[] = [
     vettedNote: 'Kitchen on Hospital Road. We ate there before onboarding.',
     phone: '08034441001',
     hours: 'Mon–Sat · 10:00 – 21:00',
+    openTime: '10:00',
+    closeTime: '21:00',
+    createdAt: null,
     lat: 6.4325,
     lng: 2.8854,
     photos: [
@@ -157,6 +222,9 @@ export const seedVendors: Vendor[] = [
     vettedNote: 'Shelf-checked every week. We only list what’s in stock.',
     phone: '08034441002',
     hours: 'Daily · 8:00 – 20:00',
+    openTime: '08:00',
+    closeTime: '20:00',
+    createdAt: null,
     lat: 6.4482,
     lng: 2.9125,
     photos: [
@@ -214,6 +282,9 @@ export const seedVendors: Vendor[] = [
     vettedNote: 'Licensed pharmacy partner. Sealed packs only.',
     phone: '08034441003',
     hours: 'Mon–Sat · 8:00 – 19:00 · Sun 10:00 – 16:00',
+    openTime: '08:00',
+    closeTime: '19:00',
+    createdAt: null,
     lat: 6.4612,
     lng: 2.9485,
     photos: [
@@ -269,6 +340,9 @@ export const seedVendors: Vendor[] = [
     vettedNote: 'Meat handled clean. Pickup window confirmed with riders.',
     phone: '08034441004',
     hours: 'Tue–Sun · 12:00 – 22:00',
+    openTime: '12:00',
+    closeTime: '22:00',
+    createdAt: null,
     lat: 6.4725,
     lng: 2.9812,
     photos: [
@@ -326,6 +400,9 @@ export const seedVendors: Vendor[] = [
     vettedNote: 'Walk-in verified. Clean counter, clear prices.',
     phone: '08034441005',
     hours: 'Daily · 7:00 – 22:00',
+    openTime: '07:00',
+    closeTime: '22:00',
+    createdAt: null,
     lat: 6.439,
     lng: 2.901,
     photos: [
@@ -411,6 +488,9 @@ export function emptyVendorDraft(name = 'New business'): Vendor {
     vettedNote: '',
     phone: '',
     hours: 'Mon–Sat · 10:00 – 20:00',
+    openTime: '10:00',
+    closeTime: '20:00',
+    createdAt: null,
     lat: null,
     lng: null,
     photos: [],

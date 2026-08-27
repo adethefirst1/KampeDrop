@@ -24,9 +24,7 @@ import {
 } from '../../lib/ridersApi'
 import { RiderWalletPanel } from './RiderWalletPanel'
 
-/** Runs filter — wallet is a separate screen, not a peer tab. */
-type RunsTab = 'active' | 'history'
-type Screen = 'runs' | 'wallet'
+type BoardTab = 'active' | 'history' | 'wallet'
 
 function formatWhen(iso: string) {
   try {
@@ -220,8 +218,7 @@ export function RiderPortalPage() {
   const token = (params.get('token') ?? '').trim()
   const { getVendor } = useCatalog()
 
-  const [screen, setScreen] = useState<Screen>('runs')
-  const [runsTab, setRunsTab] = useState<RunsTab>('active')
+  const [tab, setTab] = useState<BoardTab>('active')
   const [rider, setRider] = useState<RiderMe | null>(null)
   const [orders, setOrders] = useState<RiderPortalOrder[]>([])
   const [history, setHistory] = useState<RiderPortalOrder[]>([])
@@ -366,8 +363,7 @@ export function RiderPortalPage() {
     }
     await refresh()
     if (status === 'delivered') {
-      setScreen('runs')
-      setRunsTab('history')
+      setTab('history')
     }
   }
 
@@ -412,88 +408,58 @@ export function RiderPortalPage() {
     <div className="min-h-svh bg-[#eef1f0] text-ink">
       <header className="sticky top-0 z-30 border-b border-ink/10 bg-[#e8eceb]/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-lg items-center justify-between gap-3 px-4">
-          {screen === 'wallet' ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setScreen('runs')}
-                className="shrink-0 rounded-full px-2.5 py-1.5 text-xs font-bold text-ink-soft ring-1 ring-ink/10 hover:bg-ink/5 hover:text-ink"
-              >
-                ← Runs
-              </button>
-              <p className="font-display text-lg font-bold tracking-[-0.02em]">
-                Wallet
-              </p>
-              <span className="w-[4.5rem] shrink-0" aria-hidden />
-            </>
-          ) : (
-            <>
-              <div className="min-w-0">
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-dusk">
-                  {SITE.name} · Rider
-                </p>
-                <p className="truncate font-display text-lg font-bold tracking-[-0.02em]">
-                  {rider?.name ?? 'Rider board'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setScreen('wallet')}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ink px-3 py-2 text-dusk shadow-[0_2px_0_rgba(6,24,28,0.35)] transition hover:bg-ink-soft active:translate-y-px"
-                aria-label={
-                  walletBalance != null
-                    ? `Wallet ${formatNaira(walletBalance)}. Open wallet.`
-                    : 'Open wallet'
-                }
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  aria-hidden
-                  className="shrink-0 opacity-90"
-                >
-                  <path
-                    d="M3.5 8.5A2.5 2.5 0 0 1 6 6h12.5A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20H6A2.5 2.5 0 0 1 3.5 17.5v-9Z"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                  />
-                  <path
-                    d="M3.5 10H21"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="16.5" cy="14.5" r="1.25" fill="currentColor" />
-                </svg>
-                <span className="text-sm font-extrabold tabular-nums leading-none">
-                  {walletBalance != null ? formatNaira(walletBalance) : '₦—'}
-                </span>
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  aria-hidden
-                  className="shrink-0 opacity-80"
-                >
-                  <path
-                    d="M9 5.5 15.5 12 9 18.5"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            </>
-          )}
+          <div className="min-w-0">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-dusk">
+              {SITE.name} · Rider
+            </p>
+            <p className="truncate font-display text-lg font-bold tracking-[-0.02em]">
+              {rider?.name ?? 'Rider board'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTab('wallet')}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 shadow-[0_2px_0_rgba(6,24,28,0.35)] transition active:translate-y-px ${
+              tab === 'wallet'
+                ? 'bg-dusk text-ink ring-1 ring-ink/15'
+                : 'bg-ink text-dusk hover:bg-ink-soft'
+            }`}
+            aria-label={
+              walletBalance != null
+                ? `Wallet ${formatNaira(walletBalance)}. Open wallet.`
+                : 'Open wallet'
+            }
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden
+              className="shrink-0 opacity-90"
+            >
+              <path
+                d="M3.5 8.5A2.5 2.5 0 0 1 6 6h12.5A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20H6A2.5 2.5 0 0 1 3.5 17.5v-9Z"
+                stroke="currentColor"
+                strokeWidth="1.75"
+              />
+              <path
+                d="M3.5 10H21"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+              />
+              <circle cx="16.5" cy="14.5" r="1.25" fill="currentColor" />
+            </svg>
+            <span className="text-sm font-extrabold tabular-nums leading-none">
+              {walletBalance != null ? formatNaira(walletBalance) : '₦—'}
+            </span>
+          </button>
         </div>
       </header>
 
       <main className="mx-auto max-w-lg px-4 py-5 pb-20">
-        {screen === 'runs' && (
+        {tab !== 'wallet' && (
           <AddToHomeScreenTip
             storageKey="kampedrop-rider-home-tip-hidden"
             title="Put your rider board on the home screen"
@@ -507,7 +473,7 @@ export function RiderPortalPage() {
           </p>
         )}
 
-        {screen === 'runs' && rider && (
+        {tab !== 'wallet' && rider && (
           <section className="rounded-[1.25rem] border border-ink/10 bg-paper/90 px-4 py-4">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -585,20 +551,18 @@ export function RiderPortalPage() {
           </section>
         )}
 
-        {screen === 'runs' && (
-          <>
-            <div
-              className="mt-5 flex gap-1 rounded-full bg-ink/6 p-1"
-              role="tablist"
-              aria-label="Runs"
-            >
+        <div
+          className="mt-5 flex gap-1 rounded-full bg-ink/6 p-1"
+          role="tablist"
+          aria-label="Board"
+        >
               <button
                 type="button"
                 role="tab"
-                aria-selected={runsTab === 'active'}
-                onClick={() => setRunsTab('active')}
+                aria-selected={tab === 'active'}
+                onClick={() => setTab('active')}
                 className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
-                  runsTab === 'active'
+                  tab === 'active'
                     ? 'bg-ink text-white'
                     : 'text-muted hover:text-ink'
                 }`}
@@ -613,25 +577,38 @@ export function RiderPortalPage() {
               <button
                 type="button"
                 role="tab"
-                aria-selected={runsTab === 'history'}
-                onClick={() => setRunsTab('history')}
+                aria-selected={tab === 'history'}
+                onClick={() => setTab('history')}
                 className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
-                  runsTab === 'history'
+                  tab === 'history'
                     ? 'bg-ink text-white'
                     : 'text-muted hover:text-ink'
                 }`}
               >
                 History
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'wallet'}
+                onClick={() => setTab('wallet')}
+                className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition ${
+                  tab === 'wallet'
+                    ? 'bg-ink text-white'
+                    : 'text-muted hover:text-ink'
+                }`}
+              >
+                Wallet
+              </button>
             </div>
 
-            {actionError && (
+            {tab !== 'wallet' && actionError && (
               <p className="mt-3 rounded-xl bg-mango/15 px-3 py-2 text-sm font-semibold text-mango-deep">
                 {actionError}
               </p>
             )}
 
-            {runsTab === 'active' && (
+            {tab === 'active' && (
               <div className="mt-4 space-y-3">
                 {!loading && !orders.length && (
                   <div className="rounded-[1.25rem] border border-dashed border-ink/15 px-4 py-8 text-center">
@@ -713,7 +690,7 @@ export function RiderPortalPage() {
               </div>
             )}
 
-            {runsTab === 'history' && (
+            {tab === 'history' && (
               <div className="mt-4 space-y-3">
                 {!loading && !history.length && (
                   <div className="rounded-[1.25rem] border border-dashed border-ink/15 px-4 py-8 text-center">
@@ -755,15 +732,15 @@ export function RiderPortalPage() {
                 })}
               </div>
             )}
-          </>
-        )}
 
-        {screen === 'wallet' && token && (
-          <RiderWalletPanel
-            accessToken={token}
-            onBalanceChange={onWalletBalanceChange}
-          />
-        )}
+            {tab === 'wallet' && token && (
+              <div className="mt-4">
+                <RiderWalletPanel
+                  accessToken={token}
+                  onBalanceChange={onWalletBalanceChange}
+                />
+              </div>
+            )}
 
         {loading && !rider && (
           <p className="mt-8 text-center text-sm font-semibold text-muted">

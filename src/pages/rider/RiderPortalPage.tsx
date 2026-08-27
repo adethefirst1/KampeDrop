@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { AddToHomeScreenTip } from '../../components/AddToHomeScreenGuide'
 import { useCatalog } from '../../context/CatalogContext'
@@ -217,7 +217,6 @@ function RiderHistorySheet({
 
 export function RiderPortalPage() {
   const [params] = useSearchParams()
-  const navigate = useNavigate()
   const token = (params.get('token') ?? '').trim()
   const { getVendor } = useCatalog()
 

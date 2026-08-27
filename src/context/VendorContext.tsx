@@ -11,6 +11,7 @@ import type { OrderStatus, PlacedOrder } from './CartContext'
 import { syncBuyerOrder } from '../data/ops'
 import {
   getVendorOrders,
+  markKitchenReadyByVendor,
   updateOrderStatusByVendor,
   validatePasskeyAndReleaseByVendor,
   vendorLogin,
@@ -62,6 +63,7 @@ type VendorContextValue = {
   ingestOrder: (order: PlacedOrder & { vendorId: string }) => void
   markPreparing: (id: string) => Promise<ActionResult>
   markReadyForPickup: (id: string) => Promise<ActionResult>
+  markKitchenReady: (id: string) => Promise<ActionResult>
   confirmHandoff: (id: string, passkey: string) => Promise<ActionResult>
   getOrder: (id: string) => VendorOrder | undefined
 }
@@ -331,6 +333,18 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     [session?.accessToken, applyCloudOrder],
   )
 
+  const markKitchenReady = useCallback(
+    async (id: string) => {
+      const token = session?.accessToken
+      if (!token) return { ok: false as const, reason: 'Sign in again to update orders.' }
+      const result = await markKitchenReadyByVendor(token, id)
+      if (!result.ok) return { ok: false as const, reason: result.reason }
+      applyCloudOrder(portalToVendorOrder(result.order))
+      return { ok: true as const }
+    },
+    [session?.accessToken, applyCloudOrder],
+  )
+
   const confirmHandoff = useCallback(
     async (id: string, passkey: string) => {
       const token = session?.accessToken
@@ -384,6 +398,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
       ingestOrder,
       markPreparing,
       markReadyForPickup,
+      markKitchenReady,
       confirmHandoff,
       getOrder,
     }),
@@ -407,6 +422,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
       ingestOrder,
       markPreparing,
       markReadyForPickup,
+      markKitchenReady,
       confirmHandoff,
       getOrder,
     ],

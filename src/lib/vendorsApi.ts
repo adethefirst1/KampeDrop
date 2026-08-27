@@ -199,7 +199,7 @@ function rowToVendorPortalOrder(row: Record<string, unknown>): VendorPortalOrder
     lines: Array.isArray(row.lines) ? (row.lines as VendorPortalOrder['lines']) : [],
     vendorId: row.vendor_id != null ? String(row.vendor_id) : '',
     vendorConfirmed: Boolean(row.vendor_confirmed),
-    kitchenReady: status === 'ready_for_pickup',
+    kitchenReady: row.kitchen_ready_at != null,
     cancelledAt: row.cancelled_at != null ? String(row.cancelled_at) : null,
     cancelReason: row.cancel_reason != null ? String(row.cancel_reason) : null,
     placeName: row.place_name != null ? String(row.place_name) : null,
@@ -278,6 +278,31 @@ export async function updateOrderStatusByVendor(
   const row = Array.isArray(data) ? data[0] : data
   if (!row || typeof row !== 'object') {
     return { ok: false, reason: 'Status update returned no order.' }
+  }
+  return { ok: true, order: rowToVendorPortalOrder(row as Record<string, unknown>) }
+}
+
+/** Vendor portal: set kitchen_ready_at on delivery order while preparing. */
+export async function markKitchenReadyByVendor(
+  accessToken: string,
+  orderId: string,
+): Promise<{ ok: true; order: VendorPortalOrder } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase.rpc('mark_kitchen_ready', {
+    p_token: accessToken,
+    p_id: orderId,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || typeof row !== 'object') {
+    return { ok: false, reason: 'Kitchen ready returned no order.' }
   }
   return { ok: true, order: rowToVendorPortalOrder(row as Record<string, unknown>) }
 }

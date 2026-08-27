@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useCatalog } from '../../context/CatalogContext'
 import { labelForStatus, type OpsStatus } from '../../data/ops'
@@ -12,6 +12,7 @@ import {
   getRiderMe,
   getRiderOrderHistory,
   getRiderOrders,
+  rotateRiderToken,
   setRiderAvailability,
   updateOrderStatusByRider,
   zoneLabel,
@@ -210,6 +211,7 @@ function RiderHistorySheet({
 
 export function RiderPortalPage() {
   const [params] = useSearchParams()
+  const navigate = useNavigate()
   const token = (params.get('token') ?? '').trim()
   const { getVendor } = useCatalog()
 
@@ -225,6 +227,7 @@ export function RiderPortalPage() {
   const [zoneDraft, setZoneDraft] = useState('')
   const [availBusy, setAvailBusy] = useState(false)
   const [availError, setAvailError] = useState<string | null>(null)
+  const [logoutBusy, setLogoutBusy] = useState(false)
   const [selectedHistory, setSelectedHistory] = useState<RiderPortalOrder | null>(
     null,
   )
@@ -343,6 +346,19 @@ export function RiderPortalPage() {
     if (status === 'delivered') setTab('history')
   }
 
+  async function onLogoutEverywhere() {
+    if (!token || logoutBusy) return
+    setLogoutBusy(true)
+    setActionError(null)
+    const result = await rotateRiderToken(token)
+    setLogoutBusy(false)
+    if (!result.ok) {
+      setActionError(result.reason)
+      return
+    }
+    navigate('/rider/login', { replace: true })
+  }
+
   const landmarkOptions = useMemo(() => curatedLandmarks, [])
 
   if (!token) {
@@ -354,9 +370,15 @@ export function RiderPortalPage() {
           </p>
           <h1 className="mt-2 font-display text-2xl font-bold">Private link required</h1>
           <p className="mt-2 text-sm font-semibold text-muted">
-            Open the URL ops sent you (it includes your token). There’s no password
-            login for riders.
+            Open the URL ops sent you (it includes your token), or sign in with
+            your phone and PIN.
           </p>
+          <Link
+            to="/rider/login"
+            className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-ink px-4 py-3 text-sm font-extrabold text-dusk"
+          >
+            Sign in with phone + PIN →
+          </Link>
         </div>
       </div>
     )
@@ -374,14 +396,25 @@ export function RiderPortalPage() {
               {rider?.name ?? 'Rider board'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            disabled={loading}
-            className="shrink-0 rounded-full bg-ink/8 px-3 py-1.5 text-xs font-bold text-ink-soft ring-1 ring-ink/10"
-          >
-            {loading ? 'Refreshing…' : 'Refresh'}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              disabled={loading}
+              className="rounded-full bg-ink/8 px-3 py-1.5 text-xs font-bold text-ink-soft ring-1 ring-ink/10"
+            >
+              {loading ? 'Refreshing…' : 'Refresh'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void onLogoutEverywhere()}
+              disabled={logoutBusy}
+              title="Invalidates this private link on every device"
+              className="rounded-full px-3 py-1.5 text-xs font-bold text-muted ring-1 ring-ink/10 hover:bg-ink/5 hover:text-ink disabled:opacity-50"
+            >
+              {logoutBusy ? 'Logging out…' : 'Log out everywhere'}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -511,13 +544,17 @@ export function RiderPortalPage() {
                 order,
                 getVendor,
               )
-              const canOnTheWay = order.status !== 'on_the_way'
+              const canOnTheWay = order.status === 'picked_up'
               const canDelivered = order.status === 'on_the_way'
 
               return (
                 <article
                   key={order.id}
-                  className="rounded-[1.25rem] border border-ink/10 bg-paper/95 px-4 py-4 shadow-sm"
+                  className={`rounded-[1.25rem] border bg-paper/95 px-4 py-4 shadow-sm ${
+                    order.kitchenReadyAt
+                      ? 'border-ok/40 ring-2 ring-ok/20'
+                      : 'border-ink/10'
+                  }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-mono text-[11px] font-bold text-muted">
@@ -530,6 +567,12 @@ export function RiderPortalPage() {
                       )}
                     </span>
                   </div>
+
+                  {order.kitchenReadyAt && (
+                    <p className="mt-3 rounded-xl bg-ok/15 px-3 py-2 text-sm font-extrabold text-ok ring-1 ring-ok/25">
+                      Ready for pickup!
+                    </p>
+                  )}
 
                   <div className="mt-3">
                     <RiderOrderDetails

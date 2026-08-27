@@ -12,6 +12,7 @@ export function VendorOrderDetailPage() {
     vendorId,
     markPreparing,
     markReadyForPickup,
+    markKitchenReady,
     confirmHandoff,
   } = useVendor()
   const order = getOrder(orderId ?? '')
@@ -54,6 +55,18 @@ export function VendorOrderDetailPage() {
 
   const canReadyForPickup =
     !terminal && order.fulfillment === 'pickup' && order.status === 'preparing'
+
+  const canMarkKitchenReady =
+    !terminal &&
+    order.fulfillment === 'delivery' &&
+    order.status === 'preparing' &&
+    !order.kitchenReady
+
+  const kitchenReadyWaiting =
+    !terminal &&
+    order.fulfillment === 'delivery' &&
+    order.status === 'preparing' &&
+    order.kitchenReady
 
   const canHandoff =
     !terminal &&
@@ -166,6 +179,23 @@ export function VendorOrderDetailPage() {
             >
               {busy ? 'Updating…' : 'Ready for pickup'}
             </button>
+          )}
+
+          {canMarkKitchenReady && (
+            <button
+              type="button"
+              className="btn-ink w-full"
+              disabled={busy}
+              onClick={() => void run(() => markKitchenReady(order.id))}
+            >
+              {busy ? 'Updating…' : 'Ready for pickup'}
+            </button>
+          )}
+
+          {kitchenReadyWaiting && (
+            <p className="rounded-xl bg-ok/15 px-3 py-2.5 text-sm font-bold text-ok ring-1 ring-ok/25">
+              Ready — waiting for rider
+            </p>
           )}
 
           {order.fulfillment === 'delivery' && order.status === 'finding_rider' && (

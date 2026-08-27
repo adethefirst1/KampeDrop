@@ -47,6 +47,7 @@ import {
   AdminVendorsPage,
 } from './pages/admin/AdminCatalogPages'
 import { AdminWithdrawalsPage } from './pages/admin/AdminWithdrawalsPage'
+import { RiderLoginPage } from './pages/rider/RiderLoginPage'
 import { RiderPortalPage } from './pages/rider/RiderPortalPage'
 import { APP_BASE, appPath, isStandaloneDisplay } from './paths'
 
@@ -133,6 +134,7 @@ function AppRoutes() {
         <Route path="/admin/vendors" element={<AdminVendorsPage />} />
         <Route path="/admin/vendors/:vendorId" element={<AdminVendorEditPage />} />
 
+        <Route path="/rider/login" element={<RiderLoginPage />} />
         <Route path="/rider" element={<RiderPortalPage />} />
 
         <Route path="/browse" element={<Navigate to={APP_BASE} replace />} />

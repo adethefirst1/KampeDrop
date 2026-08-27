@@ -5,12 +5,12 @@ import { useCatalog } from '../../context/CatalogContext'
 import { useOps } from '../../context/OpsContext'
 import {
   canCancelOrder,
-  getRider,
   labelForStatus,
   pipelineFor,
   statusRank,
   timeAgo,
   type OpsOrder,
+  type OpsRider,
 } from '../../data/ops'
 import { formatNaira } from '../../data/vendors'
 import { easeOut, springSoft, tapPress } from '../../motion/tokens'
@@ -25,6 +25,59 @@ type Filter =
   | 'delivered'
   | 'cancelled'
   | 'problem'
+
+function RiderAssignButton({
+  rider,
+  selected,
+  disabled,
+  deEmphasized,
+  onAssign,
+}: {
+  rider: OpsRider
+  selected: boolean
+  disabled: boolean
+  deEmphasized?: boolean
+  onAssign: () => void
+}) {
+  const zone =
+    rider.currentZone != null
+      ? rider.area
+      : rider.available
+        ? 'Zone not set'
+        : null
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onAssign}
+      className={`flex w-full items-start justify-between gap-3 rounded-2xl px-3 py-2.5 text-left transition disabled:opacity-40 ${
+        selected
+          ? 'bg-lagoon text-white ring-1 ring-lagoon'
+          : deEmphasized
+            ? 'bg-mist/60 text-ink-soft ring-1 ring-line/60'
+            : 'bg-mist text-ink ring-1 ring-line/80'
+      }`}
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-bold">{rider.name}</p>
+        <p
+          className={`mt-0.5 text-[11px] font-semibold ${
+            selected ? 'text-white/80' : 'text-muted'
+          }`}
+        >
+          {rider.phone}
+          {zone ? ` · ${zone}` : ''}
+        </p>
+      </div>
+      {selected && (
+        <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">
+          Assigned
+        </span>
+      )}
+    </button>
+  )
+}
 
 export function AdminLoginPage() {
   const { authenticated, authReady, login } = useOps()
@@ -346,12 +399,24 @@ export function AdminOrderPage() {
     clearProblem,
     addNote,
     riders,
+    ridersLoading,
+    ridersError,
+    refreshRiders,
   } = useOps()
   const order = orderId ? getOrder(orderId) : undefined
   const [note, setNote] = useState('')
   const [problem, setProblem] = useState('late')
   const [passInput, setPassInput] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
+
+  const availableRiders = useMemo(
+    () => riders.filter((r) => r.available),
+    [riders],
+  )
+  const offDutyRiders = useMemo(
+    () => riders.filter((r) => !r.available),
+    [riders],
+  )
 
   if (!order) {
     return (
@@ -374,9 +439,11 @@ export function AdminOrderPage() {
   const pipe = pipelineFor(fulfillment)
   const vendor = getVendor(order.lines[0]?.vendorId ?? '')
   const vPhone = vendor?.phone || ''
-  const rider = getRider(order.riderId)
+  const rider = riders.find((r) => r.id === order.riderId) ?? null
   const cancelled = order.status === 'cancelled'
   const rank = statusRank(order.status, fulfillment)
+  const canAssign =
+    !cancelled && rank < statusRank('picked_up', fulfillment)
 
   function run(result: { ok: true } | { ok: false; reason: string }) {
     setActionError(result.ok ? null : result.reason)
@@ -698,30 +765,100 @@ export function AdminOrderPage() {
       {/* Rider */}
       {!pickup && (
         <section className="mt-4 rounded-[1.5rem] bg-paper p-4 ring-1 ring-line">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-lagoon">Rider</p>
-          <p className="mt-2 text-sm text-muted">
-            {rider
-              ? `${rider.name} · ${rider.phone} · ${rider.area}`
-              : 'No rider — kitchen must wait'}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {riders.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                disabled={cancelled || rank >= statusRank('picked_up', fulfillment)}
-                onClick={() => {
-                  setActionError(null)
-                  assignRider(order.id, r.id)
-                }}
-                className={`rounded-full px-3 py-2 text-xs font-bold disabled:opacity-40 ${
-                  order.riderId === r.id ? 'bg-lagoon text-white' : 'bg-mist text-ink-soft'
-                }`}
-              >
-                {r.name}
-              </button>
-            ))}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-lagoon">
+                Rider
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                {rider
+                  ? `${rider.name} · ${rider.phone}${
+                      rider.area && rider.area !== '—'
+                        ? ` · ${rider.area}`
+                        : ''
+                    }`
+                  : 'No rider — kitchen must wait'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refreshRiders()}
+              disabled={ridersLoading}
+              className="shrink-0 rounded-full bg-mist px-3 py-1.5 text-[11px] font-bold text-ink-soft disabled:opacity-50"
+            >
+              {ridersLoading ? '…' : 'Refresh'}
+            </button>
           </div>
+
+          {ridersError && (
+            <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+              {ridersError}
+            </p>
+          )}
+
+          {!ridersLoading && !ridersError && !riders.length && (
+            <p className="mt-3 rounded-xl border border-dashed border-line px-3 py-3 text-sm font-semibold text-muted">
+              No riders in the table yet. Add them in Supabase, then refresh.
+            </p>
+          )}
+
+          {availableRiders.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">
+                On duty
+              </p>
+              <div className="mt-2 flex flex-col gap-2">
+                {availableRiders.map((r) => (
+                  <RiderAssignButton
+                    key={r.id}
+                    rider={r}
+                    selected={order.riderId === r.id}
+                    disabled={!canAssign}
+                    onAssign={() => {
+                      setActionError(null)
+                      assignRider(order.id, r.id)
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {offDutyRiders.length > 0 && (
+            <div className="mt-4">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted/70">
+                Off duty
+              </p>
+              <p className="mt-0.5 text-[11px] font-semibold text-muted">
+                Still assignable in a pinch — not marked available on their board.
+              </p>
+              <div className="mt-2 flex flex-col gap-2 opacity-70">
+                {offDutyRiders.map((r) => (
+                  <RiderAssignButton
+                    key={r.id}
+                    rider={r}
+                    selected={order.riderId === r.id}
+                    disabled={!canAssign}
+                    deEmphasized
+                    onAssign={() => {
+                      setActionError(null)
+                      assignRider(order.id, r.id)
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {order.status === 'finding_rider' &&
+            !ridersLoading &&
+            availableRiders.length === 0 &&
+            offDutyRiders.length > 0 && (
+              <p className="mt-3 text-sm font-semibold text-mango">
+                Nobody on duty — pick from Off duty below, or wait for a rider to
+                go available.
+              </p>
+            )}
         </section>
       )}
 

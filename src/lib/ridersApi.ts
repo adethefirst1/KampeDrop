@@ -34,6 +34,8 @@ export type RiderPortalOrder = {
   subtotal: number
   total: number
   deliveryFee: number
+  /** Set when vendor marks kitchen pack ready for rider pickup. */
+  kitchenReadyAt: string | null
 }
 
 export type AvailableRider = {
@@ -44,6 +46,17 @@ export type AvailableRider = {
   zoneUpdatedAt: string | null
   status: string
   accessToken: string
+}
+
+/** Ops assign list — on-duty first, then off-duty (still assignable). */
+export type OpsAssignableRider = {
+  id: string
+  name: string
+  phone: string
+  available: boolean
+  currentZone: string | null
+  zoneUpdatedAt: string | null
+  status: string
 }
 
 /** Human label for a curated landmark id stored on riders.current_zone. */
@@ -96,6 +109,8 @@ function parseRiderOrder(row: Record<string, unknown>): RiderPortalOrder {
     subtotal: Number(row.subtotal ?? 0),
     total: Number(row.total ?? 0),
     deliveryFee: Number(row.delivery_fee ?? 0),
+    kitchenReadyAt:
+      row.kitchen_ready_at != null ? String(row.kitchen_ready_at) : null,
   }
 }
 
@@ -118,6 +133,73 @@ export async function getRiderMe(
   }
 
   return { ok: true, rider: parseRiderMe(data as Record<string, unknown>) }
+}
+
+export type RiderLoginResult = {
+  id: string
+  name: string
+  status: string
+  accessToken: string
+}
+
+/**
+ * Phone + PIN → access_token (same credential as /rider?token=…).
+ * Auth failures map to a single message — never leak which field was wrong.
+ */
+export async function riderLogin(
+  phone: string,
+  pin: string,
+): Promise<
+  { ok: true; rider: RiderLoginResult } | { ok: false; reason: string }
+> {
+  if (!isSupabaseConfigured()) {
+    return {
+      ok: false,
+      reason: 'Sign-in is unavailable right now (Supabase is not configured).',
+    }
+  }
+  const supabase = getSupabase()
+  if (!supabase) {
+    return { ok: false, reason: 'Sign-in is unavailable right now.' }
+  }
+
+  const { data, error } = await supabase.rpc('rider_login', {
+    p_phone: phone,
+    p_pin: pin,
+  })
+
+  if (error) {
+    const msg = error.message || ''
+    if (
+      /invalid phone or pin/i.test(msg) ||
+      /incorrect pin/i.test(msg) ||
+      /no .* found/i.test(msg)
+    ) {
+      return { ok: false, reason: 'Invalid phone or PIN.' }
+    }
+    return { ok: false, reason: msg || 'Invalid phone or PIN.' }
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || typeof row !== 'object') {
+    return { ok: false, reason: 'Invalid phone or PIN.' }
+  }
+
+  const r = row as Record<string, unknown>
+  const accessToken = r.access_token != null ? String(r.access_token) : ''
+  if (!accessToken) {
+    return { ok: false, reason: 'Sign-in succeeded but no access token was returned.' }
+  }
+
+  return {
+    ok: true,
+    rider: {
+      id: String(r.id ?? ''),
+      name: String(r.name ?? 'Rider'),
+      status: String(r.status ?? ''),
+      accessToken,
+    },
+  }
 }
 
 export async function setRiderAvailability(
@@ -160,6 +242,24 @@ export async function setRiderAvailability(
           : null,
     },
   }
+}
+
+/** Invalidate the current private link — old ?token=… stops working everywhere. */
+export async function rotateRiderToken(
+  accessToken: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { error } = await supabase.rpc('rotate_rider_token', {
+    p_token: accessToken,
+  })
+
+  if (error) return { ok: false, reason: error.message }
+  return { ok: true }
 }
 
 export async function getRiderOrders(
@@ -231,6 +331,19 @@ export async function updateOrderStatusByRider(
   return { ok: true, order: parseRiderOrder(row) }
 }
 
+function parseOpsAssignableRider(row: Record<string, unknown>): OpsAssignableRider {
+  return {
+    id: String(row.id ?? ''),
+    name: String(row.name ?? 'Rider'),
+    phone: String(row.phone ?? ''),
+    available: Boolean(row.available),
+    currentZone: row.current_zone != null ? String(row.current_zone) : null,
+    zoneUpdatedAt:
+      row.zone_updated_at != null ? String(row.zone_updated_at) : null,
+    status: String(row.status ?? ''),
+  }
+}
+
 /** Ops: riders currently marked available (RLS is_ops). */
 export async function fetchAvailableRiders(): Promise<
   { ok: true; riders: AvailableRider[] } | { ok: false; reason: string }
@@ -267,4 +380,44 @@ export async function fetchAvailableRiders(): Promise<
       }
     }),
   }
+}
+
+/**
+ * Ops assign picker: all non-suspended riders via is_ops() SELECT.
+ * Available first (by zone_updated_at), then off-duty alphabetically.
+ * No RPC — same direct table read as Available riders panel.
+ */
+export async function fetchOpsRiders(): Promise<
+  { ok: true; riders: OpsAssignableRider[] } | { ok: false; reason: string }
+> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, reason: 'Supabase is not configured.' }
+  }
+  const supabase = getSupabase()
+  if (!supabase) return { ok: false, reason: 'Supabase is not configured.' }
+
+  const { data, error } = await supabase
+    .from('riders')
+    .select(
+      'id, name, phone, available, current_zone, zone_updated_at, status',
+    )
+    .neq('status', 'suspended')
+
+  if (error) return { ok: false, reason: error.message }
+
+  const riders = (data ?? []).map((row) =>
+    parseOpsAssignableRider(row as Record<string, unknown>),
+  )
+
+  riders.sort((a, b) => {
+    if (a.available !== b.available) return a.available ? -1 : 1
+    if (a.available && b.available) {
+      const at = a.zoneUpdatedAt ? Date.parse(a.zoneUpdatedAt) : 0
+      const bt = b.zoneUpdatedAt ? Date.parse(b.zoneUpdatedAt) : 0
+      return bt - at
+    }
+    return a.name.localeCompare(b.name)
+  })
+
+  return { ok: true, riders }
 }

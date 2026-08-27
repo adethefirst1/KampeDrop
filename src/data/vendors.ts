@@ -55,7 +55,7 @@ export type Vendor = {
   items: MenuItem[]
 }
 
-export const DELIVERY_FEE = 700
+export const DELIVERY_FEE = 2000
 export const SERVICE_AREA = 'Badagry'
 
 /** Legacy field on seed/local catalog rows — not used for board auth. */

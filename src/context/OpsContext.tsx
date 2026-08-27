@@ -13,7 +13,6 @@ import type { OrderStatus, PlacedOrder } from './CartContext'
 import {
   canCancelOrder,
   placedToOps,
-  riders,
   statusLabel,
   syncBuyerOrder,
   type OpsOrder,
@@ -26,6 +25,7 @@ import {
   updateOrderInSupabase,
   validatePasskeyAndRelease,
 } from '../lib/ordersApi'
+import { fetchOpsRiders, zoneLabel } from '../lib/ridersApi'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 
 type OpsContextValue = {
@@ -68,6 +68,9 @@ type OpsContextValue = {
   clearProblem: (id: string) => void
   addNote: (id: string, text: string) => void
   riders: OpsRider[]
+  ridersLoading: boolean
+  ridersError: string | null
+  refreshRiders: () => Promise<void>
 }
 
 const OpsContext = createContext<OpsContextValue | null>(null)
@@ -94,8 +97,13 @@ export function OpsProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<OpsOrder[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [ordersError, setOrdersError] = useState<string | null>(null)
+  const [riders, setRiders] = useState<OpsRider[]>([])
+  const [ridersLoading, setRidersLoading] = useState(false)
+  const [ridersError, setRidersError] = useState<string | null>(null)
   const ordersRef = useRef(orders)
   ordersRef.current = orders
+  const ridersRef = useRef(riders)
+  ridersRef.current = riders
 
   const authenticated = Boolean(user)
 
@@ -113,6 +121,34 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     }
     setOrdersError(null)
     setOrders((prev) => mergeNotes(prev, result.orders))
+  }, [user])
+
+  const refreshRiders = useCallback(async () => {
+    if (!user) {
+      setRiders([])
+      setRidersError(null)
+      return
+    }
+    setRidersLoading(true)
+    const result = await fetchOpsRiders()
+    setRidersLoading(false)
+    if (!result.ok) {
+      setRidersError(result.reason)
+      setRiders([])
+      return
+    }
+    setRidersError(null)
+    setRiders(
+      result.riders.map((r) => ({
+        id: r.id,
+        name: r.name,
+        phone: r.phone,
+        area: zoneLabel(r.currentZone),
+        available: r.available,
+        currentZone: r.currentZone,
+        zoneUpdatedAt: r.zoneUpdatedAt,
+      })),
+    )
   }, [user])
 
   // Auth session bootstrap + listener (replaces PIN / sessionStorage)
@@ -149,6 +185,8 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     if (!user) {
       setOrders([])
       setOrdersError(null)
+      setRiders([])
+      setRidersError(null)
       return
     }
 
@@ -166,10 +204,12 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     function onVisible() {
       if (document.visibilityState !== 'visible') return
       void refreshOrders({ quiet: true })
+      void refreshRiders()
       startPolling()
     }
 
     void refreshOrders()
+    void refreshRiders()
     startPolling()
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('focus', onVisible)
@@ -179,7 +219,7 @@ export function OpsProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('focus', onVisible)
     }
-  }, [user, refreshOrders])
+  }, [user, refreshOrders, refreshRiders])
 
   const login = useCallback(async (email: string, password: string) => {
     const supabase = getSupabase()
@@ -279,7 +319,7 @@ export function OpsProvider({ children }: { children: ReactNode }) {
 
   const assignRider = useCallback(
     (id: string, riderId: string | null) => {
-      const rider = riders.find((r) => r.id === riderId)
+      const rider = ridersRef.current.find((r) => r.id === riderId)
       updateOrder(id, (o) => {
         if (o.fulfillment === 'pickup') return o
         if (o.status === 'cancelled' || o.status === 'delivered') return o
@@ -690,6 +730,9 @@ export function OpsProvider({ children }: { children: ReactNode }) {
       clearProblem,
       addNote,
       riders,
+      ridersLoading,
+      ridersError,
+      refreshRiders,
     }),
     [
       authReady,
@@ -718,6 +761,10 @@ export function OpsProvider({ children }: { children: ReactNode }) {
       flagProblem,
       clearProblem,
       addNote,
+      riders,
+      ridersLoading,
+      ridersError,
+      refreshRiders,
     ],
   )
 

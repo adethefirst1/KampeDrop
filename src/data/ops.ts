@@ -14,7 +14,12 @@ export type OpsRider = {
   id: string
   name: string
   phone: string
+  /** Display area / zone label (curated landmark text for live riders). */
   area: string
+  /** Live riders table — true = on duty for new runs. */
+  available?: boolean
+  currentZone?: string | null
+  zoneUpdatedAt?: string | null
 }
 
 export type OpsNote = {
